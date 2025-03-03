@@ -1,0 +1,28 @@
+{
+  "name": "securechat",
+  "version": "1.0.0",
+  "description": "CPSC-455 Web Application Security: Web-based realtime chatting application implemented using Websockets.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stsong0812/SecureChat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/stsong0812/SecureChat/issues"
+  },
+  "homepage": "https://github.com/stsong0812/SecureChat#readme",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "sqlite3": "^5.1.7",
+    "ws": "^8.18.1"
+  }
+}
