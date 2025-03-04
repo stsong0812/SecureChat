@@ -56,9 +56,13 @@ server.on('connection', (socket) => {
       } else {
         socket.send('Invalid credentials');     // Handles incorrect user:pass
       }
-    // Handles authenticated messages
+    // Handles authenticated message broadcasting
     } else if (socket.authenticated) {
-      socket.send('Echo: ' + msg);
+      const sender = [...clients.entries()].find(([_, client]) => client === socket)[0];
+      const broadcastMsg = `${sender}: ${msg}`;
+      for (let [_, client] of clients) {
+        if (client.authenticated) client.send(broadcastMsg);
+      }
     // Handles unauthenticated messages
     } else {
       socket.send('Please log in first');
