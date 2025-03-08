@@ -16,13 +16,19 @@ const db = new Database(dbPath);
 // Set database encryption key
 db.pragma(`key = "${dbKey}"`);
 
-// Creates the 'users' table
+// Creates user and message tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
     password TEXT
-  )
+  );
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT,
+    content TEXT,
+    timestamp INTEGER
+  );
 `);
 
 console.log('Database initialized');
