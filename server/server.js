@@ -53,6 +53,9 @@ server.on('connection', (socket) => {
         socket.authenticated = true;
         clients.set(username, socket);  // Store authenticated clients
         socket.send('Logged in successfully');
+        // Send chat history
+        const history = db.prepare('SELECT sender, content FROM messages ORDER BY timestamp ASC').all();
+        history.forEach((m) => socket.send(`${m.sender}: ${m.content}`));
       } else {
         socket.send('Invalid credentials');     // Handles incorrect user:pass
       }
@@ -60,6 +63,12 @@ server.on('connection', (socket) => {
     } else if (socket.authenticated) {
       const sender = [...clients.entries()].find(([_, client]) => client === socket)[0];
       const broadcastMsg = `${sender}: ${msg}`;
+      // Message storage
+      db.prepare('INSERT INTO messages (sender, content, timestamp) VALUES (?, ?, ?)').run(
+        sender,
+        msg,
+        Date.now()
+      );
       for (let [_, client] of clients) {
         if (client.authenticated) client.send(broadcastMsg);
       }
