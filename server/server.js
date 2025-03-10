@@ -1,6 +1,8 @@
 // Loads environment variables from .env file
 require('dotenv').config();
 
+const fs = require ('fs');
+const https = require('https');
 const WebSocket = require('ws');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
@@ -9,7 +11,14 @@ const bcrypt = require('bcrypt');
 const PORT = process.env.PORT;
 const dbPath = process.env.DB_PATH;
 const dbKey = process.env.SECRET_KEY;
+const envPath = './server/.env';
 
+//SECRET_KEY=your_secret_key_here (Generate a new key if not set)
+if (!process.env.SECRET_KEY || process.env.SECRET_KEY === 'your_secret_key_here') {
+  const newKey = crypto.randomBytes(32).toString('hex'); // Generate 32-char key
+  fs.appendFileSync(envPath, `\nSECRET_KEY=${newKey}\n`);
+  console.log(`Generated and saved new SECRET_KEY: ${newKey}`);
+}
 // Raise exception for properly set environment variables
 if (!dbPath || !dbKey) {
   throw new Error("Missing database path or encryption key in environment variables");
