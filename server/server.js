@@ -6,17 +6,27 @@ const https = require('https');
 const WebSocket = require('ws');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const dotenv = require('dotenv');
 
 // Establish server configuration from .env file
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 443;
 const dbPath = process.env.DB_PATH;
 const dbKey = process.env.SECRET_KEY;
 const envPath = './server/.env';
 
+// Load SSL Certificates
+const privateKey = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem', 'utf8');
+const certificate = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem', 'utf8');
+const credentials = { key: privateKey, cert: certificate };
+
 //SECRET_KEY=your_secret_key_here (Generate a new key if not set)
-if (!process.env.SECRET_KEY || process.env.SECRET_KEY === 'your_secret_key_here') {
-  const newKey = crypto.randomBytes(32).toString('hex'); // Generate 32-char key
-  fs.appendFileSync(envPath, `\nSECRET_KEY=${newKey}\n`);
+const envConfig = dotenv.parse(fs.readFileSync(envPath));
+
+if (!envConfig.SECRET_KEY || envConfig.SECRET_KEY === 'your_secret_key_here') {
+  const newKey = crypto.randomBytes(32).toString('hex');
+  envConfig.SECRET_KEY = newKey;
+  fs.writeFileSync(envPath, Object.entries(envConfig).map(([k, v]) => `${k}=${v}`).join('\n'));
   console.log(`Generated and saved new SECRET_KEY: ${newKey}`);
 }
 // Raise exception for properly set environment variables
@@ -30,12 +40,12 @@ const db = new Database(dbPath);
 db.pragma(`key = "${dbKey}"`);
 
 // Initialize WebSocket server on specified port
-const server = new WebSocket.Server({ port: PORT });
+const httpsServer = https.createServer(credentials);
+const wss = new WebSocket.Server({ server: httpsServer });
 // Stores authenticated clients
 const clients = new Map();
 
-//
-server.on('connection', (socket) => {
+wss.on('connection', (socket) => {
   console.log('Client connected');
   socket.authenticated = false;
 
@@ -96,4 +106,7 @@ server.on('connection', (socket) => {
   });
 });
 
-console.log(`Server running on ws://localhost:${PORT}`);
+// Start the HTTPS server
+httpsServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`SecureChat WebSocket Server running on wss://insecurechat.com`);
+});
