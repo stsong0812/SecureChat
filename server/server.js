@@ -1,5 +1,5 @@
 // Loads environment variables from .env file
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/.env' });
 
 const fs = require ('fs');
 const https = require('https');
@@ -13,7 +13,6 @@ const dotenv = require('dotenv');
 const PORT = process.env.PORT || 443;
 const dbPath = process.env.DB_PATH;
 const dbKey = process.env.SECRET_KEY;
-require('dotenv').config({ path: __dirname + '/.env' });
 
 // Load SSL Certificates
 const privateKey = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem', 'utf8');
