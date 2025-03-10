@@ -7,7 +7,6 @@ const WebSocket = require('ws');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const dotenv = require('dotenv');
 
 // Establish server configuration from .env file
 const PORT = process.env.PORT || 443;
