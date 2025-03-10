@@ -19,7 +19,6 @@ const certificate = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001
 const credentials = { key: privateKey, cert: certificate };
 
 //SECRET_KEY=your_secret_key_here (Generate a new key if not set)
-const envConfig = dotenv.parse(fs.readFileSync(envPath));
 
 if (!envConfig.SECRET_KEY || envConfig.SECRET_KEY === 'your_secret_key_here') {
   const newKey = crypto.randomBytes(32).toString('hex');
