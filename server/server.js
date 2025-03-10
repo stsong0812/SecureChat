@@ -18,14 +18,12 @@ const privateKey = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/
 const certificate = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem', 'utf8');
 const credentials = { key: privateKey, cert: certificate };
 
-//SECRET_KEY=your_secret_key_here (Generate a new key if not set)
-
-if (!envConfig.SECRET_KEY || envConfig.SECRET_KEY === 'your_secret_key_here') {
-  const newKey = crypto.randomBytes(32).toString('hex');
-  envConfig.SECRET_KEY = newKey;
-  fs.writeFileSync(envPath, Object.entries(envConfig).map(([k, v]) => `${k}=${v}`).join('\n'));
-  console.log(`Generated and saved new SECRET_KEY: ${newKey}`);
+//Stops execution if SECRET_KEY is missing or not set
+if (!process.env.SECRET_KEY || process.env.SECRET_KEY === 'your_secret_key_here') {
+  console.error("ERROR: SECRET_KEY is missing from .env");
+  process.exit(1);
 }
+
 // Raise exception for properly set environment variables
 if (!dbPath || !dbKey) {
   throw new Error("Missing database path or encryption key in environment variables");
