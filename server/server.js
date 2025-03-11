@@ -40,6 +40,29 @@ const wss = new WebSocket.Server({ server: httpsServer });
 // Stores authenticated clients
 const clients = new Map();
 
+// Serve static files
+httpsServer.on('request', (req, res) => {
+  const filePath = req.url === '/' ? '/public/index.html' : req.url;
+  fs.readFile(__dirname + filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      return res.end();
+    }
+    
+    const contentType = {
+      '.html': 'text/html',
+      '.js': 'text/javascript',
+      '.css': 'text/css',
+      '.json': 'application/json',
+      '.png': 'image/png',
+      '.ico': 'image/x-icon'
+    }[path.extname(filePath)] || 'text/plain';
+
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  });
+});
+
 wss.on('connection', (socket) => {
   console.log('Client connected');
   socket.authenticated = false;
