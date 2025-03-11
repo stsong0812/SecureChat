@@ -1,6 +1,7 @@
 // Loads environment variables from .env file
 require('dotenv').config({ path: __dirname + '/.env' });
 
+const path = require('path');
 const fs = require ('fs');
 const https = require('https');
 const WebSocket = require('ws');
@@ -36,32 +37,23 @@ db.pragma(`key = "${dbKey}"`);
 
 // Initialize WebSocket server on specified port
 const httpsServer = https.createServer(credentials);
-const wss = new WebSocket.Server({ server: httpsServer });
+const wss = new WebSocket.Server({ server: httpsServer, path: "/ws" });
+
 // Stores authenticated clients
 const clients = new Map();
 
-// Serve static files
-httpsServer.on('request', (req, res) => {
-  const filePath = req.url === '/' ? '/public/index.html' : req.url;
-  fs.readFile(__dirname + filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      return res.end();
-    }
-    
-    const contentType = {
-      '.html': 'text/html',
-      '.js': 'text/javascript',
-      '.css': 'text/css',
-      '.json': 'application/json',
-      '.png': 'image/png',
-      '.ico': 'image/x-icon'
-    }[path.extname(filePath)] || 'text/plain';
+const express = require('express');
+const app = express();
 
-    res.writeHead(200, { 'Content-Type': contentType });
-    res.end(data);
-  });
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
+
+
+// Attach Express to HTTPS Server
+httpsServer.on('request', app);
 
 wss.on('connection', (socket) => {
   console.log('Client connected');
