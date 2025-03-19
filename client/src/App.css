@@ -107,3 +107,27 @@ body {
 .input input:focus {
   border-bottom-color: #00ff00;
 }
+
+.popup {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #c9d1d9;
+  font-family: 'Fira Mono', monospace;
+  font-size: 14px;
+  background: none;
+  padding: 5px 15px;
+  z-index: 1000;
+  animation: fadeOut 3s forwards;
+}
+
+.popup.success {
+  color: #00ff00;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}

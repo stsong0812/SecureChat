@@ -1,29 +1,14 @@
 // Loads environment variables from .env file
-require('dotenv').config({ path: __dirname + '/.env' });
+require('dotenv').config();
 
-const path = require('path');
-const fs = require ('fs');
-const https = require('https');
 const WebSocket = require('ws');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 
 // Establish server configuration from .env file
-const PORT = process.env.PORT || 443;
+const PORT = process.env.PORT;
 const dbPath = process.env.DB_PATH;
 const dbKey = process.env.SECRET_KEY;
-
-// Load SSL Certificates
-const privateKey = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem', 'utf8');
-const certificate = fs.readFileSync('/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem', 'utf8');
-const credentials = { key: privateKey, cert: certificate };
-
-//Stops execution if SECRET_KEY is missing or not set
-if (!process.env.SECRET_KEY || process.env.SECRET_KEY === 'your_secret_key_here') {
-  console.error("ERROR: SECRET_KEY is missing from .env");
-  process.exit(1);
-}
 
 // Raise exception for properly set environment variables
 if (!dbPath || !dbKey) {
@@ -33,29 +18,40 @@ if (!dbPath || !dbKey) {
 // Establish connection to database
 const db = new Database(dbPath);
 // Apply database encryption key
-db.pragma(`key = "${dbKey}"`);
+db.pragma('key = "${dbKey}"');
+
+// Rate limiting configuration
+const LOGIN_LIMIT = 5;
+const LOGIN_WINDOW = 60 * 1000;
+const MESSAGE_LIMIT = 10;
+const MESSAGE_WINDOW = 60 * 1000;
+
+const loginAttempts = {};
+const messageCounts = {};
+
+function checkRateLimit(key, limit, window, trackingObject) {
+  const now = Date.now();
+  if (!trackingObject[key]){
+    trackingObject[key] = { count: 1, timestamp: now };
+    return true;
+  }
+  const attempt = trackingObject[key];
+  if (now - attempt.timestamp > window) { 
+    attempt.count = 1;
+    attempt.timestamp = now;
+    return true;
+  } else {
+    attempt.count += 1;
+    return attempt.count <= limit;
+  }
+}
 
 // Initialize WebSocket server on specified port
-const httpsServer = https.createServer(credentials);
-const wss = new WebSocket.Server({ server: httpsServer, path: "/ws" });
-
+const server = new WebSocket.Server({ port: PORT });
 // Stores authenticated clients
 const clients = new Map();
 
-const express = require('express');
-const app = express();
-
-app.use(express.static(path.join(__dirname, '../client/build')));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
-
-
-// Attach Express to HTTPS Server
-httpsServer.on('request', app);
-
-wss.on('connection', (socket) => {
+server.on('connection', (socket) => {
   console.log('Client connected');
   socket.authenticated = false;
 
@@ -63,13 +59,26 @@ wss.on('connection', (socket) => {
     const msg = message.toString();
     console.log('Received:', msg);
 
+    // Get client IP address for unauth rate limiting
+    const ip = socket._socket.remoteAddress;
+
+    // Rate limiting user registration and login
+    if (msg.startsWith('register:') || msg.startsWith('login:')) {
+      if (!checkRateLimit(ip, LOGIN_LIMIT, LOGIN_WINDOW, loginAttempts)) {
+        socket.send('Too many attempts, please try again later');
+        return;
+      }
+    }
+
     // Handles user registration
     if (msg.startsWith('register:')) {
       const [, username, password] = msg.split(':');
       try {
         const hash = bcrypt.hashSync(password, 10); // Hash password using bcrypt
         db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hash);
+        console.log('Attempting to send registration success');
         socket.send('Registered successfully');
+        console.log('Sent registration success');
       } catch (e) {
         socket.send('Error: Username taken');   // Handles duplicate usernames
       }
@@ -80,6 +89,7 @@ wss.on('connection', (socket) => {
       // Validate user credentials
       if (user && bcrypt.compareSync(password, user.password)) {
         socket.authenticated = true;
+        socket.username = username;
         clients.set(username, socket);  // Store authenticated clients
         socket.send('Logged in successfully');
         // Send chat history
@@ -90,18 +100,25 @@ wss.on('connection', (socket) => {
       }
     // Handles authenticated message broadcasting
     } else if (socket.authenticated) {
-      const sender = [...clients.entries()].find(([_, client]) => client === socket)[0];
-      const broadcastMsg = `${sender}: ${msg}`;
-      // Message storage
+      const sender = socket.username;
+      if (!checkRateLimit(sender, MESSAGE_LIMIT, MESSAGE_WINDOW, messageCounts)) {
+        socket.send('Message rate limit exceeded, please wait');
+        return;
+      } 
+      else {
+        const broadcastMsg = `${sender}: ${msg}`;
+      // Store message in database
       db.prepare('INSERT INTO messages (sender, content, timestamp) VALUES (?, ?, ?)').run(
         sender,
         msg,
         Date.now()
       );
-      for (let [_, client] of clients) {
+      // Broadcast to all authenticated clients
+      server.clients.forEach((client) => {
         if (client.authenticated) client.send(broadcastMsg);
-      }
-    // Handles unauthenticated messages
+      });
+    }
+    // Handle unauthenticated messages
     } else {
       socket.send('Please log in first');
     }
@@ -116,7 +133,4 @@ wss.on('connection', (socket) => {
   });
 });
 
-// Start the HTTPS server
-httpsServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`SecureChat WebSocket Server running on wss://insecurechat.com`);
-});
+console.log(`Server running on ws://localhost:${PORT}`);
