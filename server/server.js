@@ -69,10 +69,27 @@ server.on('connection', (socket) => {
         return;
       }
     }
-
+    function validCreds(username, password) {
+      if (!username || username.length < 3 || username.length > 20) {
+        return 'Username must be between 3 and 20 characters';
+      }
+      if (!password || password.length < 6 || password.length > 50) {
+        return 'Password must be between 6 and 50 characters';
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        return 'Username can only contain letters, numbers, and underscores';
+      }
+      return null; 
+    }
     // Handles user registration
     if (msg.startsWith('register:')) {
       const [, username, password] = msg.split(':');
+      const validationError = validCreds(username, password);
+      if (validationError) {
+        socket.send(`Error: ${validationError}`);
+        return;
+      }
+      // Validate user credentials
       try {
         const hash = bcrypt.hashSync(password, 10); // Hash password using bcrypt
         db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hash);
@@ -82,6 +99,7 @@ server.on('connection', (socket) => {
       } catch (e) {
         socket.send('Error: Username taken');   // Handles duplicate usernames
       }
+    
     // Handles user login 
     } else if (msg.startsWith('login:')) {
       const [, username, password] = msg.split(':');

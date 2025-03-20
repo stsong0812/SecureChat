@@ -36,7 +36,7 @@ function App() {
     setWs(websocket);
     return () => websocket.close();
   }, []);
-
+// TODO - implement client side validation credentials
   const handleServerMessage = (msg) => {
     if (msg === 'Registered successfully') {
       showPopupMessage('Registration successful! Please log in.', 'success');
