@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import EmojiPicker from 'emoji-picker-react';
 import './App.css';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
   const [popupMessage, setPopupMessage] = useState('');
   const [showPopup, setShowPopup] = useState(false);
   const [popupType, setPopupType] = useState('success');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     const websocket = new WebSocket('ws://localhost:7777');
@@ -36,7 +38,7 @@ function App() {
     setWs(websocket);
     return () => websocket.close();
   }, []);
-// TODO - implement client side validation credentials
+
   const handleServerMessage = (msg) => {
     if (msg === 'Registered successfully') {
       showPopupMessage('Registration successful! Please log in.', 'success');
@@ -89,6 +91,12 @@ function App() {
     }
   };
 
+  
+  const handleEmojiClick = (emojiObject) => {
+    setMessage((prev) => prev + emojiObject.emoji);
+    setShowEmojiPicker(false);
+  };
+
   return (
     <div className="terminal">
       <div className="header">securechat@localhost:~$</div>
@@ -114,21 +122,15 @@ function App() {
             />
           </div>
           <div className="commands">
-            <span className="command" onClick={register}>
-              register
-            </span>
-            <span className="command" onClick={login}>
-              login
-            </span>
+            <span className="command" onClick={register}>register</span>
+            <span className="command" onClick={login}>login</span>
           </div>
         </div>
       ) : (
         <div className="chat">
           <div className="messages">
             {messages.map((msg, i) => (
-              <div key={i} className="message">
-                {msg}
-              </div>
+              <div key={i} className="message">{msg}</div>
             ))}
           </div>
           <div className="input">
@@ -139,6 +141,10 @@ function App() {
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
             />
+            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+              😀
+            </button>
+            {showEmojiPicker && <EmojiPicker onEmojiClick={handleEmojiClick} />}
           </div>
         </div>
       )}
