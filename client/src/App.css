@@ -1,133 +1,154 @@
-  body {
-    background-color: #0d1117;
-    margin: 0;
-    padding: 0;
-    font-family: 'Fira Mono', monospace;
-    color: #c9d1d9;
-  }
+body {
+  background-color: #0d1117;
+  margin: 0;
+  padding: 0;
+  font-family: 'Fira Mono', monospace;
+  color: #c9d1d9;
+}
 
-  .terminal {
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 15px;
-    background-color: #0d1117;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-  }
+.terminal {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 15px;
+  background-color: #0d1117;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
 
-  .header {
-    font-size: 16px;
-    color: #00ff00;
-    margin-bottom: 10px;
-  }
+.header {
+  font-size: 16px;
+  color: #00ff00;
+  margin-bottom: 10px;
+}
 
-  .login {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 300px;
-  }
+.login {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 300px;
+}
 
-  .prompt {
-    display: flex;
-    align-items: center;
-  }
+.prompt {
+  display: flex;
+  align-items: center;
+}
 
-  .prompt input {
-    background-color: #0d1117;
-    border: none;
-    border-bottom: 1px solid #444;
-    color: #c9d1d9;
-    font-family: 'Fira Mono', monospace;
-    padding: 4px;
-    margin-left: 8px;
-    outline: none;
-  }
+.prompt input {
+  background-color: #0d1117;
+  border: none;
+  border-bottom: 1px solid #444;
+  color: #c9d1d9;
+  font-family: 'Fira Mono', monospace;
+  padding: 4px;
+  margin-left: 8px;
+  outline: none;
+}
 
-  .prompt input:focus {
-    border-bottom-color: #00ff00;
-  }
+.prompt input:focus {
+  border-bottom-color: #00ff00;
+}
 
-  .commands {
-    margin-top: 8px;
-  }
+.commands {
+  margin-top: 8px;
+}
 
-  .command {
-    color: #00ff00;
-    cursor: pointer;
-    margin-right: 20px;
-  }
+.command {
+  color: #00ff00;
+  cursor: pointer;
+  margin-right: 20px;
+}
 
-  .command:hover {
-    text-decoration: underline;
-  }
+.command:hover {
+  text-decoration: underline;
+}
 
-  .chat {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-  }
+.chat {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
 
-  .messages {
-    min-height: 300px;
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 10px 0;
-  }
+.messages {
+  min-height: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px 0;
+}
 
-  .message {
-    font-size: 14px;
-    padding: 4px 0;
-  }
+.message {
+  font-size: 14px;
+  padding: 4px 0;
+}
 
-  .input {
-    display: flex;
-    align-items: center;
-  }
+.input {
+  display: flex;
+  align-items: center;
+}
 
-  .input .prompt {
-    color: #00ff00;
-    margin-right: 8px;
-  }
+.input .prompt {
+  color: #00ff00;
+  margin-right: 8px;
+}
 
-  .input input {
-    flex-grow: 1;
-    background-color: #0d1117;
-    border: none;
-    border-bottom: 1px solid #444;
-    color: #c9d1d9;
-    font-family: 'Fira Mono', monospace;
-    padding: 4px;
-    outline: none;
-  }
+.input input {
+  flex-grow: 1;
+  background-color: #0d1117;
+  border: none;
+  border-bottom: 1px solid #444;
+  color: #c9d1d9;
+  font-family: 'Fira Mono', monospace;
+  padding: 4px;
+  outline: none;
+}
 
-  .input input:focus {
-    border-bottom-color: #00ff00;
-  }
+.input input:focus {
+  border-bottom-color: #00ff00;
+}
 
-  .popup {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #c9d1d9;
-    font-family: 'Fira Mono', monospace;
-    font-size: 14px;
-    background: none;
-    padding: 5px 15px;
-    z-index: 1000;
-    animation: fadeOut 3s forwards;
-  }
+.popup {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #c9d1d9;
+  font-family: 'Fira Mono', monospace;
+  font-size: 14px;
+  background: none;
+  padding: 5px 15px;
+  z-index: 1000;
+  animation: fadeOut 3s forwards;
+}
 
-  .popup.success {
-    color: #00ff00;
-  }
+.popup.success {
+  color: #00ff00;
+}
 
-  @keyframes fadeOut {
-    0% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; }
-  }
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 60px;
+  right: 10px;
+  z-index: 1000;
+}
+
+.input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.input button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2em;
+}
