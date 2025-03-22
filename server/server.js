@@ -18,6 +18,10 @@ const dbKey = process.env.SECRET_KEY;
 if (!dbPath || !dbKey) {
   throw new Error("Missing database path or encryption key in environment variables");
 }
+// Check if database file exists
+if (!fs.existsSync(dbPath)) {
+  throw new Error(`Database not found at ${dbPath}. Please run auth-db.js first.`);
+}
 
 // Establish connection to database
 const db = new Database(dbPath);

@@ -1,4 +1,6 @@
 // Loads environment variables from .env file
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 const Database = require('better-sqlite3');
 
@@ -10,7 +12,10 @@ const dbKey = process.env.SECRET_KEY;
 if (!dbPath || !dbKey) {
   throw new Error("Missing database path or encryption key in environment variables");
 }
-
+// Check if database file exists
+if(fs.existsSync(dbPath)) {
+  console.log(`Database already exists at ${dbPath}. Skipping creation.`)
+}
 // Establish connection to database
 const db = new Database(dbPath);
 // Set database encryption key
