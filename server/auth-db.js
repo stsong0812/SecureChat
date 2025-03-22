@@ -16,7 +16,7 @@ const db = new Database(dbPath);
 // Set database encryption key
 db.pragma(`key = "${dbKey}"`);
 
-// Creates user and message tables
+// Creates user, message, and file tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,6 +27,13 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender TEXT,
     content TEXT,
+    timestamp INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT,
+    fileUrl TEXT,
+    fileName TEXT,
     timestamp INTEGER
   );
 `);
