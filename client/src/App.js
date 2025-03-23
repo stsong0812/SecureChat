@@ -1,54 +1,61 @@
-import React, { useState, useEffect, useRef } from 'react';
-import './App.css';
-import EmojiPicker from 'emoji-picker-react';
+import React, { useState, useEffect, useRef } from "react";
+import "./App.css";
+import EmojiPicker from "emoji-picker-react";
 
 function App() {
   const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [loggedIn, setLoggedIn] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
+  const [popupMessage, setPopupMessage] = useState("");
   const [showPopup, setShowPopup] = useState(false);
-  const [popupType, setPopupType] = useState('success');
+  const [popupType, setPopupType] = useState("success");
+  const [recipient, setRecipient] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const websocket = new WebSocket('ws://localhost:7777');
+    const websocket = new WebSocket("ws://localhost:7777");
     websocket.onopen = () => {
-      console.log('WebSocket connection established');
+      console.log("WebSocket connection established");
       setIsConnected(true);
     };
     websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error("WebSocket error:", error);
       setIsConnected(false);
     };
     websocket.onclose = () => {
-      console.log('WebSocket connection closed');
+      console.log("WebSocket connection closed");
       setIsConnected(false);
     };
     websocket.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         const { type, message, sender, content, fileUrl, fileName } = data;
-        if (type === 'status') {
-          showPopupMessage(message, 'success');
-          if (message === 'Logged in successfully') {
+        if (type === "status") {
+          showPopupMessage(message, "success");
+          if (message === "Logged in successfully") {
             setLoggedIn(true);
             setMessages([]);
           }
-        } else if (type === 'error') {
-          showPopupMessage(message, 'error');
-        } else if (type === 'text') {
-          setMessages((prev) => [...prev, { type: 'text', content: `${sender}: ${content}` }]);
-        } else if (type === 'file') {
-          setMessages((prev) => [...prev, { type: 'file', sender, fileUrl, fileName }]);
+        } else if (type === "error") {
+          showPopupMessage(message, "error");
+        } else if (type === "text") {
+          setMessages((prev) => [
+            ...prev,
+            { type: "text", content: `${sender}: ${content}` },
+          ]);
+        } else if (type === "file") {
+          setMessages((prev) => [
+            ...prev,
+            { type: "file", sender, fileUrl, fileName },
+          ]);
         }
       } catch (error) {
-        console.error('Invalid message format:', e.data);
+        console.error("Invalid message format:", e.data);
       }
     };
 
@@ -56,7 +63,7 @@ function App() {
     return () => websocket.close();
   }, []);
 
-  const showPopupMessage = (message, type = 'success') => {
+  const showPopupMessage = (message, type = "success") => {
     setPopupMessage(message);
     setShowPopup(true);
     setPopupType(type);
@@ -65,24 +72,36 @@ function App() {
 
   const register = () => {
     if (ws && isConnected) {
-      ws.send(JSON.stringify({ type: 'register', username, password }));
+      ws.send(JSON.stringify({ type: "register", username, password }));
     } else {
-      showPopupMessage('WebSocket connection not established');
+      showPopupMessage("WebSocket connection not established");
     }
   };
 
   const login = () => {
     if (ws && isConnected) {
-      ws.send(JSON.stringify({ type: 'login', username, password }));
+      ws.send(JSON.stringify({ type: "login", username, password }));
     } else {
-      showPopupMessage('WebSocket connection not established');
+      showPopupMessage("WebSocket connection not established");
     }
   };
 
   const sendMessage = () => {
     if (ws && loggedIn) {
-      ws.send(JSON.stringify({ type: 'text', content: message }));
-      setMessage('');
+      if (!recipient) {
+        // makes sure recipient is selected
+        showPopupMessage("Please select a recipient", "error");
+        return;
+      }
+      ws.send(
+        JSON.stringify({
+          type: "text",
+          content: message,
+          from: username,
+          to: recipient,
+        })
+      );
+      setMessage("");
     }
   };
 
@@ -101,7 +120,7 @@ function App() {
     // Send file start message
     ws.send(
       JSON.stringify({
-        type: 'file_start',
+        type: "file_start",
         uploadId,
         fileName: file.name,
         fileSize: file.size,
@@ -119,11 +138,14 @@ function App() {
       reader.onload = () => {
         const data = reader.result;
         const base64 = btoa(
-          new Uint8Array(data).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          new Uint8Array(data).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ""
+          )
         );
         ws.send(
           JSON.stringify({
-            type: 'file_chunk',
+            type: "file_chunk",
             uploadId,
             chunkIndex: i,
             data: base64,
@@ -135,8 +157,8 @@ function App() {
   };
 
   const isImage = (fileName) => {
-    const ext = fileName.split('.').pop().toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'gif'].includes(ext);
+    const ext = fileName.split(".").pop().toLowerCase();
+    return ["jpg", "jpeg", "png", "gif"].includes(ext);
   };
 
   return (
@@ -148,7 +170,7 @@ function App() {
       {!loggedIn ? (
         <div className="login">
           <div className="prompt">
-            username:{' '}
+            username:{" "}
             <input
               type="text"
               value={username}
@@ -156,7 +178,7 @@ function App() {
             />
           </div>
           <div className="prompt">
-            password:{' '}
+            password:{" "}
             <input
               type="password"
               value={password}
@@ -176,21 +198,38 @@ function App() {
         <div className="chat">
           <div className="messages">
             {messages.map((msg, i) => {
-              if (msg.type === 'text') {
-                return <div key={i} className="message">{msg.content}</div>;
-              } else if (msg.type === 'file') {
+              if (msg.type === "text") {
+                return (
+                  <div key={i} className="message">
+                    {msg.content}
+                  </div>
+                );
+              } else if (msg.type === "file") {
                 if (isImage(msg.fileName)) {
                   return (
                     <div key={i} className="message">
-                      <div><strong>{msg.sender}</strong>:</div>
-                      <img src={msg.fileUrl} alt={msg.fileName} style={{ maxWidth: '200px' }} />
+                      <div>
+                        <strong>{msg.sender}</strong>:
+                      </div>
+                      <img
+                        src={msg.fileUrl}
+                        alt={msg.fileName}
+                        style={{ maxWidth: "200px" }}
+                      />
                     </div>
                   );
                 } else {
                   return (
                     <div key={i} className="message">
-                      <div><strong>{msg.sender}</strong>:</div>
-                      <a href={msg.fileUrl} download={msg.fileName} target="_blank" rel="noopener noreferrer">
+                      <div>
+                        <strong>{msg.sender}</strong>:
+                      </div>
+                      <a
+                        href={msg.fileUrl}
+                        download={msg.fileName}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         {msg.fileName}
                       </a>
                     </div>
@@ -200,18 +239,33 @@ function App() {
               return null;
             })}
           </div>
+          // Select the chat recipient (hardcoded for now, will be dynamic
+          later)
+          <div className="prompt">
+            chat with:{" "}
+            <select
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+            >
+              <option value="">-- select user --</option>
+              <option value="User1">User1</option>
+              <option value="User2">User2</option>
+            </select>
+          </div>
           <div className="input">
             <span className="prompt">$ </span>
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
             />
-            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😀</button>
+            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+              😀
+            </button>
             <input
               type="file"
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
               ref={fileInputRef}
               onChange={handleFileSelect}
             />
