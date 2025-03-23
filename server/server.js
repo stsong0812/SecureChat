@@ -253,7 +253,14 @@ wss.on("connection", (socket) => {
     } else if (type === "text") {
       if (socket.authenticated) {
         const { content } = data;
-        if (!checkRateLimit(socket.username, MESSAGE_LIMIT, MESSAGE_WINDOW, messageCounts)) {
+        if (
+          !checkRateLimit(
+            socket.username,
+            MESSAGE_LIMIT,
+            MESSAGE_WINDOW,
+            messageCounts
+          )
+        ) {
           socket.send(
             JSON.stringify({
               type: "error",
@@ -346,33 +353,61 @@ wss.on("connection", (socket) => {
   });
 });
 
-// Send room history to a client
+// Send room history to a client, merging text and files by timestamp
 function sendRoomHistory(socket, room) {
-  const history = db
+  // Fetch text messages
+  const textMessages = db
     .prepare(
-      "SELECT sender, content FROM messages WHERE room = ? ORDER BY timestamp ASC"
+      "SELECT sender, content, timestamp, 'text' AS type FROM messages WHERE room = ?"
     )
-    .all(room);
-  history.forEach((m) =>
-    socket.send(
-      JSON.stringify({ type: "text", sender: m.sender, content: m.content })
-    )
-  );
-  const fileHistory = db
+    .all(room)
+    .map((m) => ({
+      type: m.type,
+      sender: m.sender,
+      content: m.content,
+      timestamp: m.timestamp,
+    }));
+
+  // Fetch file messages
+  const fileMessages = db
     .prepare(
-      "SELECT sender, fileUrl, fileName FROM files WHERE room = ? ORDER BY timestamp ASC"
+      "SELECT sender, fileUrl, fileName, timestamp, 'file' AS type FROM files WHERE room = ?"
     )
-    .all(room);
-  fileHistory.forEach((f) =>
-    socket.send(
-      JSON.stringify({
-        type: "file",
-        sender: f.sender,
-        fileUrl: f.fileUrl,
-        fileName: f.fileName,
-      })
-    )
+    .all(room)
+    .map((f) => ({
+      type: f.type,
+      sender: f.sender,
+      fileUrl: f.fileUrl,
+      fileName: f.fileName,
+      timestamp: f.timestamp,
+    }));
+
+  // Merge and sort by timestamp
+  const history = [...textMessages, ...fileMessages].sort(
+    (a, b) => a.timestamp - b.timestamp
   );
+
+  // Send merged history to the client
+  history.forEach((item) => {
+    if (item.type === "text") {
+      socket.send(
+        JSON.stringify({
+          type: "text",
+          sender: item.sender,
+          content: item.content,
+        })
+      );
+    } else if (item.type === "file") {
+      socket.send(
+        JSON.stringify({
+          type: "file",
+          sender: item.sender,
+          fileUrl: item.fileUrl,
+          fileName: item.fileName,
+        })
+      );
+    }
+  });
 }
 
 // Broadcast message to all clients in a room
