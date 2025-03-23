@@ -2,6 +2,67 @@ import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
 
+// Encryption utilities
+const deriveRoomKey = async (roomName) => {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(roomName + "secret"), // Simple derivation; use a proper secret in production
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: encoder.encode("salt"),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+};
+
+const encryptMessage = async (text, key) => {
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoder.encode(text)
+  );
+  return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
+};
+
+const decryptMessage = async (encrypted, key) => {
+  if (typeof encrypted === "string") return encrypted; // Handle old plain text
+  try {
+    const decoder = new TextDecoder();
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: new Uint8Array(encrypted.iv) },
+      key,
+      new Uint8Array(encrypted.data)
+    );
+    return decoder.decode(decrypted);
+  } catch (error) {
+    console.error("Decryption failed:", error, "Encrypted content:", encrypted);
+    return "[Decryption Error]";
+  }
+};
+
+const encryptFileChunk = async (chunk, key) => {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    chunk
+  );
+  return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
+};
+
 function App() {
   const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -19,59 +80,81 @@ function App() {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
+  const roomKeysRef = useRef({});
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const websocket = new WebSocket("wss://localhost:7777");
-    websocket.onopen = () => {
-      console.log("WebSocket connection established");
-      setIsConnected(true);
-    };
-    websocket.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      setIsConnected(false);
-    };
-    websocket.onclose = () => {
-      console.log("WebSocket connection closed");
-      setIsConnected(false);
-      setLoggedIn(false);
-    };
-    websocket.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        const { type, message, sender, content, rooms, fileUrl, fileName, room } = data;
+    const initializeWebSocket = async () => {
+      const websocket = new WebSocket("wss://localhost:7777");
+      websocket.onopen = async () => {
+        console.log("WebSocket connection established");
+        setIsConnected(true);
+        const generalKey = await deriveRoomKey("general");
+        roomKeysRef.current["general"] = generalKey;
+        console.log("Initial room key set for 'general':", generalKey);
+      };
+      websocket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setIsConnected(false);
+      };
+      websocket.onclose = () => {
+        console.log("WebSocket connection closed");
+        setIsConnected(false);
+        setLoggedIn(false);
+      };
+      websocket.onmessage = async (e) => {
+        try {
+          console.log("Raw WebSocket message received:", e.data);
+          const data = JSON.parse(e.data);
+          const { type, message, sender, content, rooms, fileUrl, fileName, room } = data;
 
-        if (type === "status") {
-          showPopupMessage(message, "success");
-          if (message.startsWith("Joined room:")) {
-            const roomName = message.split(":")[1].trim();
-            setCurrentRoom(roomName);
-            setMessages([]); // Clear messages for new room
-          } else if (message === "Logged in successfully") {
-            setLoggedIn(true);
-            websocket.send(JSON.stringify({ type: "get_rooms" }));
-            setCurrentRoom("general");
-          } else if (message === "Room created successfully") {
-            // Optional: Auto-join the newly created room
+          console.log("Parsed message:", data);
+
+          if (type === "status") {
+            showPopupMessage(message, "success");
+            if (message.startsWith("Joined room:")) {
+              const roomName = message.split(":")[1].trim();
+              setCurrentRoom(roomName);
+              setMessages([]);
+              if (!roomKeysRef.current[roomName]) {
+                const key = await deriveRoomKey(roomName);
+                roomKeysRef.current[roomName] = key;
+                console.log(`Room key set for '${roomName}':`, key);
+              }
+            } else if (message === "Logged in successfully") {
+              setLoggedIn(true);
+              websocket.send(JSON.stringify({ type: "get_rooms" }));
+              setCurrentRoom("general");
+            }
+          } else if (type === "error") {
+            showPopupMessage(message, "error");
+          } else if (type === "text") {
+            console.log("Processing text message:", { sender, content });
+            console.log("Current room:", currentRoom, "Decryption key:", roomKeysRef.current[currentRoom]);
+            const decrypted = await decryptMessage(content, roomKeysRef.current[currentRoom]);
+            console.log("Decrypted message:", decrypted);
+            setMessages((prev) => {
+              const newMessages = [...prev, { type: "text", content: `${sender}: ${decrypted}` }];
+              console.log("Updated messages state:", newMessages);
+              return newMessages;
+            });
+          } else if (type === "file") {
+            setMessages((prev) => [...prev, { type: "file", sender, fileUrl, fileName }]);
+          } else if (type === "room_list") {
+            setRooms(rooms);
+          } else if (type === "new_room") {
+            setRooms((prevRooms) => [...prevRooms, room]);
           }
-        } else if (type === "error") {
-          showPopupMessage(message, "error");
-        } else if (type === "text") {
-          setMessages((prev) => [...prev, { type: "text", content: `${sender}: ${content}` }]);
-        } else if (type === "file") {
-          setMessages((prev) => [...prev, { type: "file", sender, fileUrl, fileName }]);
-        } else if (type === "room_list") {
-          setRooms(rooms);
-        } else if (type === "new_room") {
-          setRooms((prevRooms) => [...prevRooms, room]);
+        } catch (error) {
+          console.error("Invalid message format or processing error:", error, "Raw data:", e.data);
         }
-      } catch (error) {
-        console.error("Invalid message format:", e.data);
-      }
+      };
+
+      setWs(websocket);
+      return () => websocket.close();
     };
 
-    setWs(websocket);
-    return () => websocket.close();
+    initializeWebSocket();
   }, []);
 
   const showPopupMessage = (message, type = "success") => {
@@ -113,17 +196,18 @@ function App() {
 
   const logout = () => {
     if (ws && isConnected) {
-      ws.close(); // Simply close the connection; server will handle cleanup
+      ws.close();
       setLoggedIn(false);
       setUsername("");
       setPassword("");
       setMessages([]);
       setCurrentRoom("general");
       setRooms([{ name: "general", isPublic: true }]);
+      roomKeysRef.current = {};
     }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!ws || !loggedIn) {
       showPopupMessage("Not logged in or WebSocket not connected", "error");
       return;
@@ -141,7 +225,11 @@ function App() {
         const isPublic = visibility === "public";
         ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password }));
       } else {
-        ws.send(JSON.stringify({ type: "text", content: message }));
+        console.log("Sending message:", message);
+        console.log("Using encryption key for", currentRoom, ":", roomKeysRef.current[currentRoom]);
+        const encrypted = await encryptMessage(message, roomKeysRef.current[currentRoom]);
+        console.log("Encrypted message sent:", encrypted);
+        ws.send(JSON.stringify({ type: "text", content: encrypted }));
       }
       setMessage("");
     }
@@ -169,17 +257,11 @@ function App() {
     setPasswordInput("");
   };
 
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      uploadFile(file);
-    }
-  };
-
-  const uploadFile = (file) => {
+  const uploadFile = async (file) => {
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const key = roomKeysRef.current[currentRoom];
 
     ws.send(
       JSON.stringify({
@@ -197,11 +279,10 @@ function App() {
       const chunk = file.slice(start, end);
       const reader = new FileReader();
 
-      reader.onload = () => {
+      reader.onload = async () => {
         const data = reader.result;
-        const base64 = btoa(
-          new Uint8Array(data).reduce((data, byte) => data + String.fromCharCode(byte), "")
-        );
+        const encryptedChunk = await encryptFileChunk(new Uint8Array(data), key);
+        const base64 = btoa(JSON.stringify(encryptedChunk));
         ws.send(
           JSON.stringify({
             type: "file_chunk",
@@ -212,6 +293,35 @@ function App() {
         );
       };
       reader.readAsArrayBuffer(chunk);
+    }
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      uploadFile(file);
+    }
+  };
+
+  const decryptAndDownloadFile = async (fileUrl, fileName) => {
+    try {
+      const response = await fetch(fileUrl);
+      const encryptedData = await response.arrayBuffer();
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: new Uint8Array(12) },
+        roomKeysRef.current[currentRoom],
+        encryptedData
+      );
+      const blob = new Blob([decrypted]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("File decryption failed:", error);
+      showPopupMessage("Failed to decrypt file", "error");
     }
   };
 
@@ -276,7 +386,15 @@ function App() {
                       <div>
                         <strong>{msg.sender}</strong>:
                       </div>
-                      <img src={msg.fileUrl} alt={msg.fileName} style={{ maxWidth: "200px" }} />
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          decryptAndDownloadFile(msg.fileUrl, msg.fileName);
+                        }}
+                      >
+                        {msg.fileName} (encrypted)
+                      </a>
                     </div>
                   );
                 } else {
@@ -285,8 +403,14 @@ function App() {
                       <div>
                         <strong>{msg.sender}</strong>:
                       </div>
-                      <a href={msg.fileUrl} download={msg.fileName} target="_blank" rel="noopener noreferrer">
-                        {msg.fileName}
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          decryptAndDownloadFile(msg.fileUrl, msg.fileName);
+                        }}
+                      >
+                        {msg.fileName} (encrypted)
                       </a>
                     </div>
                   );

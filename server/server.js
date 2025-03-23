@@ -89,15 +89,15 @@ function checkRateLimit(key, limit, window, trackingObject) {
   }
 }
 
-// Logging function for room messages
+// Logging function for room messages (logs encrypted data)
 function logMessage(room, sender, content, isFile = false, fileUrl = "") {
   const timestamp = new Date().toISOString();
   const logFile = path.join(logsDir, `${room}.log`);
   let logEntry;
   if (isFile) {
-    logEntry = `[${timestamp}] ${sender} uploaded file: ${content} (${fileUrl})\n`;
+    logEntry = `[${timestamp}] ${sender} uploaded encrypted file: ${content} (${fileUrl})\n`;
   } else {
-    logEntry = `[${timestamp}] ${sender}: ${content}\n`;
+    logEntry = `[${timestamp}] ${sender}: ${JSON.stringify(content)}\n`; // Log encrypted content
   }
   fs.appendFile(logFile, logEntry, (err) => {
     if (err) {
@@ -128,7 +128,6 @@ wss.on("connection", (socket) => {
     const { type } = data;
     const ip = socket._socket.remoteAddress;
 
-    // Rate limit login and registration
     if (type === "register" || type === "login") {
       if (!checkRateLimit(ip, LOGIN_LIMIT, LOGIN_WINDOW, loginAttempts)) {
         socket.send(
@@ -141,7 +140,6 @@ wss.on("connection", (socket) => {
       }
     }
 
-    // Handle different message types
     if (type === "register") {
       const { username, password } = data;
       try {
@@ -252,7 +250,7 @@ wss.on("connection", (socket) => {
       }
     } else if (type === "text") {
       if (socket.authenticated) {
-        const { content } = data;
+        const { content } = data; // Encrypted content
         if (
           !checkRateLimit(
             socket.username,
@@ -272,8 +270,7 @@ wss.on("connection", (socket) => {
         const broadcastMsg = { type: "text", sender: socket.username, content };
         db.prepare(
           "INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)"
-        ).run(socket.room, socket.username, content, Date.now());
-        // Log the text message
+        ).run(socket.room, socket.username, JSON.stringify(content), Date.now());
         logMessage(socket.room, socket.username, content);
         broadcast(socket.room, broadcastMsg);
       } else {
@@ -304,7 +301,9 @@ wss.on("connection", (socket) => {
         const { uploadId, chunkIndex, data: chunkData } = data;
         const upload = uploads[uploadId];
         if (upload) {
-          upload.chunks[chunkIndex] = Buffer.from(chunkData, "base64");
+          // Decode base64-encoded encrypted JSON chunk
+          const decodedChunk = JSON.parse(atob(chunkData));
+          upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
           upload.receivedChunks++;
           if (upload.receivedChunks === upload.totalChunks) {
             const fileBuffer = Buffer.concat(upload.chunks);
@@ -323,7 +322,6 @@ wss.on("connection", (socket) => {
               fileUrl,
               fileName: upload.fileName,
             };
-            // Log the file upload
             logMessage(socket.room, socket.username, upload.fileName, true, fileUrl);
             broadcast(socket.room, broadcastMsg);
             delete uploads[uploadId];
@@ -355,18 +353,26 @@ wss.on("connection", (socket) => {
 
 // Send room history to a client, merging text and files by timestamp
 function sendRoomHistory(socket, room) {
-  // Fetch text messages
+  // Fetch text messages (encrypted or plain)
   const textMessages = db
     .prepare(
       "SELECT sender, content, timestamp, 'text' AS type FROM messages WHERE room = ?"
     )
     .all(room)
-    .map((m) => ({
-      type: m.type,
-      sender: m.sender,
-      content: m.content,
-      timestamp: m.timestamp,
-    }));
+    .map((m) => {
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(m.content); // Try parsing as JSON (encrypted)
+      } catch (e) {
+        parsedContent = m.content; // Fall back to plain text if not JSON
+      }
+      return {
+        type: m.type,
+        sender: m.sender,
+        content: parsedContent,
+        timestamp: m.timestamp,
+      };
+    });
 
   // Fetch file messages
   const fileMessages = db
