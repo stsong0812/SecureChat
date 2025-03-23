@@ -86,55 +86,6 @@ function checkRateLimit(key, limit, window, trackingObject) {
 }
 
 const clients = new Map();
-const activeLogs = new Map();
-
-function logMessage(room, from, content) {
-  // Sanitize the room name to ensure safe filenames
-  const safeRoom = room.replace(/[^a-z0-9]/gi, "_");
-
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split("T")[0];
-
-  // Check if the log file is for today
-  const currentLogPath = activeLogs.get(safeRoom);
-  if (currentLogPath && !currentLogPath.includes(today)) {
-    // If the log file is from a previous day, create a new one
-    activeLogs.delete(safeRoom);
-  }
-
-  // If a log file doesn't exist for this room session, create one with a timestamp
-  if (!activeLogs.has(safeRoom)) {
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[:.]/g, "-")
-      .replace("T", "_")
-      .replace("Z", "");
-    const filename = `${safeRoom}_${timestamp}.txt`;
-    const fullPath = path.join(__dirname, "chatlogs", today, filename); // Organize by date
-
-    // Create the date folder if it doesn't exist
-    fs.mkdirSync(path.join(__dirname, "chatlogs", today), { recursive: true });
-
-    // Add metadata at the top of the log file
-    const metadata = `=== Chat Started in Room: ${room} ===\n`;
-    fs.appendFileSync(fullPath, metadata);
-
-    // Store the log file path in the Map
-    activeLogs.set(safeRoom, fullPath);
-  }
-
-  // Get the log file path
-  const logPath = activeLogs.get(safeRoom);
-
-  // Format the message: [Time] User: Message
-  const now = new Date().toLocaleTimeString();
-  const logLine = `[${now}] ${from}: ${content}\n`;
-
-  // Append the message to the log file
-  fs.appendFile(logPath, logLine, (err) => {
-    if (err) console.error("Failed to write to log file:", err);
-  });
-}
 
 // WebSocket connection handling
 wss.on("connection", (socket) => {
@@ -281,28 +232,17 @@ wss.on("connection", (socket) => {
     } else if (type === "text") {
       if (socket.authenticated) {
         const { content } = data;
-        if (
-          !checkRateLimit(
-            socket.username,
-            MESSAGE_LIMIT,
-            MESSAGE_WINDOW,
-            messageCounts
-          )
-        ) {
-          socket.send(
-            JSON.stringify({
-              type: "error",
-              message: "Message rate limit exceeded, please wait",
-            })
-          );
+        if (!checkRateLimit(socket.username, MESSAGE_LIMIT, MESSAGE_WINDOW, messageCounts)) {
+          socket.send(JSON.stringify({ type: "error", message: "Message rate limit exceeded, please wait" }));
           return;
         }
         const broadcastMsg = { type: "text", sender: socket.username, content };
-        db.prepare(
-          "INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)"
-        ).run(socket.room, socket.username, content, Date.now());
-        logMessage(socket.room, socket.username, content);
-
+        db.prepare("INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)").run(
+          socket.room,
+          socket.username,
+          content,
+          Date.now()
+        );
         broadcast(socket.room, broadcastMsg);
       } else {
         socket.send(
