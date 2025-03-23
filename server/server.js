@@ -1,7 +1,7 @@
 // server.js
 require("dotenv").config();
 const express = require("express");
-const http = require("http");
+const https = require("https");
 const WebSocket = require("ws");
 const Database = require("better-sqlite3");
 const bcrypt = require("bcrypt");
@@ -42,10 +42,24 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Set up Express and WebSocket server
+// Load SSL/TLS certificates
+const options = {
+  key: fs.readFileSync(path.join(__dirname, "key.pem")),
+  cert: fs.readFileSync(path.join(__dirname, "cert.pem"))
+};
+
+// Set up Express and HTTPS server
 const app = express();
-const server = http.createServer(app);
+const server = https.createServer(options, app);
 const wss = new WebSocket.Server({ server });
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, "../client/build")));
+
+// Handle React routing, return all requests to React app
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/build", "index.html"));
+});
 
 app.use("/uploads", express.static(uploadsDir));
 
@@ -271,5 +285,5 @@ function broadcastToAll(message) {
 
 // Start the server
 server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Secure server running on https://localhost:${PORT}`);
 });
