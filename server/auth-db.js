@@ -1,46 +1,52 @@
-// Loads environment variables from .env file
 const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
 const Database = require('better-sqlite3');
+require('dotenv').config();
 
-// Establish database path and key from .env file
 const dbPath = process.env.DB_PATH;
 const dbKey = process.env.SECRET_KEY;
 
-// Raise exception for properly set environment variables
 if (!dbPath || !dbKey) {
   throw new Error("Missing database path or encryption key in environment variables");
 }
-// Check if database file exists
-if(fs.existsSync(dbPath)) {
-  console.log(`Database already exists at ${dbPath}. Skipping creation.`)
+
+if (fs.existsSync(dbPath)) {
+  console.log(`Database exists at ${dbPath}. Skipping creation.`);
+} else {
+  const db = new Database(dbPath);
+  db.pragma(`key = "${dbKey}"`);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE,
+      password TEXT
+    );
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room TEXT,
+      sender TEXT,
+      content TEXT,
+      timestamp INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room TEXT,
+      sender TEXT,
+      fileUrl TEXT,
+      fileName TEXT,
+      timestamp INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS rooms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE,
+      isPublic BOOLEAN,
+      password TEXT
+    );
+  `);
+
+  // Insert only the "general" room
+  db.prepare("INSERT OR IGNORE INTO rooms (name, isPublic, password) VALUES (?, ?, ?)")
+    .run("general", 1, null); // Public room, no password
+
+  console.log('Database initialized with "general" room');
 }
-// Establish connection to database
-const db = new Database(dbPath);
-// Set database encryption key
-db.pragma(`key = "${dbKey}"`);
-
-// Creates user, message, and file tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT
-  );
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sender TEXT,
-    content TEXT,
-    timestamp INTEGER
-  );
-  CREATE TABLE IF NOT EXISTS files (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sender TEXT,
-    fileUrl TEXT,
-    fileName TEXT,
-    timestamp INTEGER
-  );
-`);
-
-console.log('Database initialized');
