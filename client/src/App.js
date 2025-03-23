@@ -22,7 +22,7 @@ function App() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const websocket = new WebSocket('ws://localhost:7777');
+    const websocket = new WebSocket('wss://localhost:7777');
     websocket.onopen = () => {
       console.log('WebSocket connection established');
       setIsConnected(true);
