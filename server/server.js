@@ -40,10 +40,14 @@ const loginAttempts = {};
 const messageCounts = {};
 const uploads = {};
 
-// Create uploads directory if it doesn't exist
+// Create uploads and logs directories if they don't exist
 const uploadsDir = path.join(__dirname, "uploads");
+const logsDir = path.join(__dirname, "logs");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
+}
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
 }
 
 // Load SSL/TLS certificates
@@ -83,6 +87,23 @@ function checkRateLimit(key, limit, window, trackingObject) {
     attempt.count += 1;
     return attempt.count <= limit;
   }
+}
+
+// Logging function for room messages
+function logMessage(room, sender, content, isFile = false, fileUrl = "") {
+  const timestamp = new Date().toISOString();
+  const logFile = path.join(logsDir, `${room}.log`);
+  let logEntry;
+  if (isFile) {
+    logEntry = `[${timestamp}] ${sender} uploaded file: ${content} (${fileUrl})\n`;
+  } else {
+    logEntry = `[${timestamp}] ${sender}: ${content}\n`;
+  }
+  fs.appendFile(logFile, logEntry, (err) => {
+    if (err) {
+      console.error(`Failed to log to ${logFile}:`, err);
+    }
+  });
 }
 
 const clients = new Map();
@@ -233,16 +254,20 @@ wss.on("connection", (socket) => {
       if (socket.authenticated) {
         const { content } = data;
         if (!checkRateLimit(socket.username, MESSAGE_LIMIT, MESSAGE_WINDOW, messageCounts)) {
-          socket.send(JSON.stringify({ type: "error", message: "Message rate limit exceeded, please wait" }));
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              message: "Message rate limit exceeded, please wait",
+            })
+          );
           return;
         }
         const broadcastMsg = { type: "text", sender: socket.username, content };
-        db.prepare("INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)").run(
-          socket.room,
-          socket.username,
-          content,
-          Date.now()
-        );
+        db.prepare(
+          "INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)"
+        ).run(socket.room, socket.username, content, Date.now());
+        // Log the text message
+        logMessage(socket.room, socket.username, content);
         broadcast(socket.room, broadcastMsg);
       } else {
         socket.send(
@@ -283,13 +308,7 @@ wss.on("connection", (socket) => {
 
             db.prepare(
               "INSERT INTO files (room, sender, fileUrl, fileName, timestamp) VALUES (?, ?, ?, ?, ?)"
-            ).run(
-              socket.room,
-              socket.username,
-              fileUrl,
-              upload.fileName,
-              Date.now()
-            );
+            ).run(socket.room, socket.username, fileUrl, upload.fileName, Date.now());
 
             const broadcastMsg = {
               type: "file",
@@ -297,6 +316,8 @@ wss.on("connection", (socket) => {
               fileUrl,
               fileName: upload.fileName,
             };
+            // Log the file upload
+            logMessage(socket.room, socket.username, upload.fileName, true, fileUrl);
             broadcast(socket.room, broadcastMsg);
             delete uploads[uploadId];
           } else {

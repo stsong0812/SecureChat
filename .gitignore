@@ -2,5 +2,5 @@ node_modules/
 .env
 securechat.db
 *.pem
-server/chatlogs/*
+server/logs/*
 server/uploads/*
