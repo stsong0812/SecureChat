@@ -14,11 +14,15 @@ const dbKey = process.env.SECRET_KEY;
 
 // Validate environment variables
 if (!dbPath || !dbKey) {
-  throw new Error("Missing database path or encryption key in environment variables");
+  throw new Error(
+    "Missing database path or encryption key in environment variables"
+  );
 }
 
 if (!fs.existsSync(dbPath)) {
-  throw new Error(`Database not found at ${dbPath}. Please run auth-db.js first.`);
+  throw new Error(
+    `Database not found at ${dbPath}. Please run auth-db.js first.`
+  );
 }
 
 // Initialize SQLite database
@@ -46,10 +50,34 @@ if (!fs.existsSync(logsDir)) {
 }
 
 // Load SSL/TLS certificates
+const isProduction = process.env.NODE_ENV === "production";
+
+const options = isProduction
+  ? {
+      key: fs.readFileSync(
+        "/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem"
+      ),
+      cert: fs.readFileSync(
+        "/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem"
+      ),
+    }
+  : {
+      key: fs.readFileSync(path.join(__dirname, "key.pem")),
+      cert: fs.readFileSync(path.join(__dirname, "cert.pem")),
+    };
+
+/* 
+For prouction in insecurechat.com
 const options = {
-  key: fs.readFileSync(path.join(__dirname, "key.pem")),
-  cert: fs.readFileSync(path.join(__dirname, "cert.pem")),
+  key: fs.readFileSync(
+    "/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem"
+  ),
+  cert: fs.readFileSync(
+    "/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem"
+  ),
 };
+
+*/
 
 // Set up Express and HTTPS server
 const app = express();
@@ -197,7 +225,7 @@ wss.on("connection", (socket) => {
         broadcastToAll({
           type: "new_room",
           room: { name: roomName, isPublic },
-          roomKeyJwk // Broadcast for real-time updates
+          roomKeyJwk, // Broadcast for real-time updates
         });
       } catch (e) {
         socket.send(
@@ -239,7 +267,7 @@ wss.on("connection", (socket) => {
           JSON.stringify({
             type: "status",
             message: `Joined room: ${room}`,
-            roomKeyJwk: roomData.key ? JSON.parse(roomData.key) : null // Send stored JWK
+            roomKeyJwk: roomData.key ? JSON.parse(roomData.key) : null, // Send stored JWK
           })
         );
         sendRoomHistory(socket, room);
@@ -270,7 +298,12 @@ wss.on("connection", (socket) => {
         const broadcastMsg = { type: "text", sender: socket.username, content };
         db.prepare(
           "INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)"
-        ).run(socket.room, socket.username, JSON.stringify(content), Date.now());
+        ).run(
+          socket.room,
+          socket.username,
+          JSON.stringify(content),
+          Date.now()
+        );
         logMessage(socket.room, socket.username, content);
         broadcast(socket.room, broadcastMsg);
       } else {
@@ -313,7 +346,13 @@ wss.on("connection", (socket) => {
 
             db.prepare(
               "INSERT INTO files (room, sender, fileUrl, fileName, timestamp) VALUES (?, ?, ?, ?, ?)"
-            ).run(socket.room, socket.username, fileUrl, upload.fileName, Date.now());
+            ).run(
+              socket.room,
+              socket.username,
+              fileUrl,
+              upload.fileName,
+              Date.now()
+            );
 
             const broadcastMsg = {
               type: "file",
@@ -321,7 +360,13 @@ wss.on("connection", (socket) => {
               fileUrl,
               fileName: upload.fileName,
             };
-            logMessage(socket.room, socket.username, upload.fileName, true, fileUrl);
+            logMessage(
+              socket.room,
+              socket.username,
+              upload.fileName,
+              true,
+              fileUrl
+            );
             broadcast(socket.room, broadcastMsg);
             delete uploads[uploadId];
           } else {

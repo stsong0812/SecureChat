@@ -6,7 +6,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "init-db": "node auth-db.js",
-    "dev": "npm run init-db && npm run start"
+    "dev": "npm run init-db && npm run start",
+    "local-start": "cross-env NODE_ENV=development node server.js",
+    "dns-start": "cross-env NODE_ENV=production node server.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +20,8 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
-  
 }
