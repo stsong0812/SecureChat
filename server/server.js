@@ -1,4 +1,3 @@
-// server.js
 require("dotenv").config();
 const express = require("express");
 const https = require("https");
@@ -15,15 +14,11 @@ const dbKey = process.env.SECRET_KEY;
 
 // Validate environment variables
 if (!dbPath || !dbKey) {
-  throw new Error(
-    "Missing database path or encryption key in environment variables"
-  );
+  throw new Error("Missing database path or encryption key in environment variables");
 }
 
 if (!fs.existsSync(dbPath)) {
-  throw new Error(
-    `Database not found at ${dbPath}. Please run auth-db.js first.`
-  );
+  throw new Error(`Database not found at ${dbPath}. Please run auth-db.js first.`);
 }
 
 // Initialize SQLite database
@@ -181,7 +176,7 @@ wss.on("connection", (socket) => {
         );
         return;
       }
-      const { roomName, isPublic, password } = data;
+      const { roomName, isPublic, password, roomKeyJwk } = data;
       if (!roomName) {
         socket.send(
           JSON.stringify({ type: "error", message: "Room name is required" })
@@ -191,8 +186,8 @@ wss.on("connection", (socket) => {
       try {
         const hash = isPublic ? null : bcrypt.hashSync(password, 10);
         db.prepare(
-          "INSERT INTO rooms (name, isPublic, password) VALUES (?, ?, ?)"
-        ).run(roomName, isPublic ? 1 : 0, hash);
+          "INSERT INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)"
+        ).run(roomName, isPublic ? 1 : 0, hash, JSON.stringify(roomKeyJwk)); // Store JWK as JSON string
         socket.send(
           JSON.stringify({
             type: "status",
@@ -202,6 +197,7 @@ wss.on("connection", (socket) => {
         broadcastToAll({
           type: "new_room",
           room: { name: roomName, isPublic },
+          roomKeyJwk // Broadcast for real-time updates
         });
       } catch (e) {
         socket.send(
@@ -226,7 +222,7 @@ wss.on("connection", (socket) => {
       }
       const { room, password } = data;
       const roomData = db
-        .prepare("SELECT isPublic, password FROM rooms WHERE name = ?")
+        .prepare("SELECT isPublic, password, key FROM rooms WHERE name = ?")
         .get(room);
       if (!roomData) {
         socket.send(
@@ -240,7 +236,11 @@ wss.on("connection", (socket) => {
       ) {
         socket.room = room;
         socket.send(
-          JSON.stringify({ type: "status", message: `Joined room: ${room}` })
+          JSON.stringify({
+            type: "status",
+            message: `Joined room: ${room}`,
+            roomKeyJwk: roomData.key ? JSON.parse(roomData.key) : null // Send stored JWK
+          })
         );
         sendRoomHistory(socket, room);
       } else {
@@ -301,7 +301,6 @@ wss.on("connection", (socket) => {
         const { uploadId, chunkIndex, data: chunkData } = data;
         const upload = uploads[uploadId];
         if (upload) {
-          // Decode base64-encoded encrypted JSON chunk
           const decodedChunk = JSON.parse(atob(chunkData));
           upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
           upload.receivedChunks++;
@@ -353,7 +352,6 @@ wss.on("connection", (socket) => {
 
 // Send room history to a client, merging text and files by timestamp
 function sendRoomHistory(socket, room) {
-  // Fetch text messages (encrypted or plain)
   const textMessages = db
     .prepare(
       "SELECT sender, content, timestamp, 'text' AS type FROM messages WHERE room = ?"
@@ -374,7 +372,6 @@ function sendRoomHistory(socket, room) {
       };
     });
 
-  // Fetch file messages
   const fileMessages = db
     .prepare(
       "SELECT sender, fileUrl, fileName, timestamp, 'file' AS type FROM files WHERE room = ?"
@@ -388,12 +385,10 @@ function sendRoomHistory(socket, room) {
       timestamp: f.timestamp,
     }));
 
-  // Merge and sort by timestamp
   const history = [...textMessages, ...fileMessages].sort(
     (a, b) => a.timestamp - b.timestamp
   );
 
-  // Send merged history to the client
   history.forEach((item) => {
     if (item.type === "text") {
       socket.send(

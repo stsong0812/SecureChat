@@ -40,13 +40,14 @@ if (fs.existsSync(dbPath)) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT UNIQUE,
       isPublic BOOLEAN,
-      password TEXT
+      password TEXT,
+      key TEXT  -- Added column to store JWK key as JSON string
     );
   `);
 
   // Insert only the "general" room
-  db.prepare("INSERT OR IGNORE INTO rooms (name, isPublic, password) VALUES (?, ?, ?)")
-    .run("general", 1, null); // Public room, no password
+  db.prepare("INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)")
+    .run("general", 1, null, null); // Public room, no password, no key initially
 
   console.log('Database initialized with "general" room');
 }

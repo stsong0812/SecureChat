@@ -7,7 +7,7 @@ const deriveRoomKey = async (roomName) => {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(roomName + "secret"), // Simple derivation; use a proper secret in production
+    encoder.encode(roomName + "secret"),
     { name: "PBKDF2" },
     false,
     ["deriveKey"]
@@ -24,6 +24,14 @@ const deriveRoomKey = async (roomName) => {
     true,
     ["encrypt", "decrypt"]
   );
+};
+
+const exportKey = async (key) => {
+  return await crypto.subtle.exportKey("jwk", key);
+};
+
+const importKey = async (jwk) => {
+  return await crypto.subtle.importKey("jwk", jwk, { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
 };
 
 const encryptMessage = async (text, key) => {
@@ -63,6 +71,16 @@ const encryptFileChunk = async (chunk, key) => {
   return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
 };
 
+// Parse markdown-like syntax to HTML
+const parseFormattedText = (text) => {
+  let formatted = text
+    .replace(/\*(.*?)\*/g, "<b>$1</b>")
+    .replace(/_(.*?)_/g, "<i>$1</i>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  console.log("Formatted text:", formatted);
+  return formatted;
+};
+
 function App() {
   const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -81,17 +99,19 @@ function App() {
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const roomKeysRef = useRef({});
+  const pendingMessagesRef = useRef({}); // Map of roomName to pending messages
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const initializeWebSocket = async () => {
+    const initializeKeysAndWebSocket = async () => {
+      const generalKey = await deriveRoomKey("general");
+      roomKeysRef.current = { general: generalKey };
+      console.log("Initial room key set for 'general':", generalKey);
+
       const websocket = new WebSocket("wss://localhost:7777");
-      websocket.onopen = async () => {
+      websocket.onopen = () => {
         console.log("WebSocket connection established");
         setIsConnected(true);
-        const generalKey = await deriveRoomKey("general");
-        roomKeysRef.current["general"] = generalKey;
-        console.log("Initial room key set for 'general':", generalKey);
       };
       websocket.onerror = (error) => {
         console.error("WebSocket error:", error);
@@ -106,7 +126,7 @@ function App() {
         try {
           console.log("Raw WebSocket message received:", e.data);
           const data = JSON.parse(e.data);
-          const { type, message, sender, content, rooms, fileUrl, fileName, room } = data;
+          const { type, message, sender, content, rooms, fileUrl, fileName, room, roomKeyJwk } = data;
 
           console.log("Parsed message:", data);
 
@@ -116,10 +136,13 @@ function App() {
               const roomName = message.split(":")[1].trim();
               setCurrentRoom(roomName);
               setMessages([]);
-              if (!roomKeysRef.current[roomName]) {
-                const key = await deriveRoomKey(roomName);
-                roomKeysRef.current[roomName] = key;
-                console.log(`Room key set for '${roomName}':`, key);
+              console.log(`Switched to room '${roomName}', current keys:`, roomKeysRef.current);
+              if (roomKeysRef.current[roomName] && pendingMessagesRef.current[roomName]) {
+                const pending = pendingMessagesRef.current[roomName];
+                delete pendingMessagesRef.current[roomName];
+                for (const msg of pending) {
+                  await processTextMessage(msg.sender, msg.content, roomName);
+                }
               }
             } else if (message === "Logged in successfully") {
               setLoggedIn(true);
@@ -129,21 +152,37 @@ function App() {
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
-            console.log("Processing text message:", { sender, content });
-            console.log("Current room:", currentRoom, "Decryption key:", roomKeysRef.current[currentRoom]);
-            const decrypted = await decryptMessage(content, roomKeysRef.current[currentRoom]);
-            console.log("Decrypted message:", decrypted);
-            setMessages((prev) => {
-              const newMessages = [...prev, { type: "text", content: `${sender}: ${decrypted}` }];
-              console.log("Updated messages state:", newMessages);
-              return newMessages;
-            });
+            if (!roomKeysRef.current[currentRoom]) {
+              console.log(`Key not ready for '${currentRoom}', queuing message`);
+              if (!pendingMessagesRef.current[currentRoom]) {
+                pendingMessagesRef.current[currentRoom] = [];
+              }
+              pendingMessagesRef.current[currentRoom].push({ sender, content });
+            } else {
+              await processTextMessage(sender, content, currentRoom);
+            }
           } else if (type === "file") {
             setMessages((prev) => [...prev, { type: "file", sender, fileUrl, fileName }]);
           } else if (type === "room_list") {
             setRooms(rooms);
           } else if (type === "new_room") {
-            setRooms((prevRooms) => [...prevRooms, room]);
+            setRooms((prevRooms) => {
+              const newRooms = [...prevRooms, room];
+              if (!roomKeysRef.current[room.name] && roomKeyJwk) {
+                importKey(roomKeyJwk).then((key) => {
+                  roomKeysRef.current[room.name] = key;
+                  console.log(`Imported room key for '${room.name}' from JWK:`, key);
+                  if (pendingMessagesRef.current[room.name]) {
+                    const pending = pendingMessagesRef.current[room.name];
+                    delete pendingMessagesRef.current[room.name];
+                    for (const msg of pending) {
+                      processTextMessage(msg.sender, msg.content, room.name);
+                    }
+                  }
+                });
+              }
+              return newRooms;
+            });
           }
         } catch (error) {
           console.error("Invalid message format or processing error:", error, "Raw data:", e.data);
@@ -154,8 +193,21 @@ function App() {
       return () => websocket.close();
     };
 
-    initializeWebSocket();
+    initializeKeysAndWebSocket();
   }, []);
+
+  const processTextMessage = async (sender, content, room) => {
+    console.log("Processing text message:", { sender, content });
+    console.log("Using decryption key for", room, ":", roomKeysRef.current[room]);
+    const decrypted = await decryptMessage(content, roomKeysRef.current[room]);
+    console.log("Decrypted message:", decrypted);
+    const formatted = parseFormattedText(decrypted);
+    setMessages((prev) => {
+      const newMessages = [...prev, { type: "text", content: `${sender}: ${formatted}` }];
+      console.log("Updated messages state:", newMessages);
+      return newMessages;
+    });
+  };
 
   const showPopupMessage = (message, type = "success") => {
     setPopupMessage(message);
@@ -223,9 +275,26 @@ function App() {
         const visibility = parts[2] || "public";
         const password = parts[3] || "";
         const isPublic = visibility === "public";
-        ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password }));
+        if (!roomKeysRef.current[roomName]) {
+          const key = await deriveRoomKey(roomName);
+          roomKeysRef.current[roomName] = key;
+          const jwkKey = await exportKey(key);
+          console.log(`Pre-derived and exported room key for '${roomName}':`, key, "JWK:", jwkKey);
+          ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password, roomKeyJwk: jwkKey }));
+        } else {
+          ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password }));
+        }
+        setTimeout(() => {
+          ws.send(JSON.stringify({ type: "join", room: roomName }));
+          setCurrentRoom(roomName);
+          console.log(`Auto-joined room '${roomName}'`);
+        }, 500);
       } else {
-        console.log("Sending message:", message);
+        console.log("Sending message:", message, "in room:", currentRoom);
+        if (!roomKeysRef.current[currentRoom]) {
+          showPopupMessage(`No key for room '${currentRoom}', please rejoin`, "error");
+          return;
+        }
         console.log("Using encryption key for", currentRoom, ":", roomKeysRef.current[currentRoom]);
         const encrypted = await encryptMessage(message, roomKeysRef.current[currentRoom]);
         console.log("Encrypted message sent:", encrypted);
@@ -240,6 +309,7 @@ function App() {
     if (!roomName) return;
     const room = rooms.find((r) => r.name === roomName);
     if (room.isPublic) {
+      console.log("Switching to room:", roomName);
       ws.send(JSON.stringify({ type: "join", room: roomName }));
     } else {
       setSelectedRoom(roomName);
@@ -252,6 +322,7 @@ function App() {
       showPopupMessage("Password required for private room", "error");
       return;
     }
+    console.log("Joining private room:", selectedRoom);
     ws.send(JSON.stringify({ type: "join", room: selectedRoom, password: passwordInput }));
     setShowPasswordInput(false);
     setPasswordInput("");
@@ -375,9 +446,11 @@ function App() {
             {messages.map((msg, i) => {
               if (msg.type === "text") {
                 return (
-                  <div key={i} className="message">
-                    {msg.content}
-                  </div>
+                  <div
+                    key={i}
+                    className="message"
+                    dangerouslySetInnerHTML={{ __html: msg.content }}
+                  />
                 );
               } else if (msg.type === "file") {
                 if (isImage(msg.fileName)) {
@@ -426,7 +499,7 @@ function App() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type a message or /create roomName [public|private] [password]"
+              placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
             />
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>🤫</button>
             <input type="file" style={{ display: "none" }} ref={fileInputRef} onChange={handleFileSelect} />
