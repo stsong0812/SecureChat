@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
 
-// Encryption utilities
+// Encryption utilities (only used for "general" room)
 const deriveRoomKey = async (roomName) => {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -46,7 +46,7 @@ const encryptMessage = async (text, key) => {
 };
 
 const decryptMessage = async (encrypted, key) => {
-  if (typeof encrypted === "string") return encrypted; // Handle old plain text
+  if (typeof encrypted === "string") return encrypted; // Handle plain text
   try {
     const decoder = new TextDecoder();
     const decrypted = await crypto.subtle.decrypt(
@@ -98,7 +98,7 @@ function App() {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  const roomKeysRef = useRef({});
+  const roomKeysRef = useRef({}); // Only used for "general"
   const pendingMessagesRef = useRef({}); // Map of roomName to pending messages
   const fileInputRef = useRef(null);
 
@@ -152,7 +152,7 @@ function App() {
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
-            if (!roomKeysRef.current[currentRoom]) {
+            if (currentRoom === "general" && !roomKeysRef.current[currentRoom]) {
               console.log(`Key not ready for '${currentRoom}', queuing message`);
               if (!pendingMessagesRef.current[currentRoom]) {
                 pendingMessagesRef.current[currentRoom] = [];
@@ -168,19 +168,7 @@ function App() {
           } else if (type === "new_room") {
             setRooms((prevRooms) => {
               const newRooms = [...prevRooms, room];
-              if (!roomKeysRef.current[room.name] && roomKeyJwk) {
-                importKey(roomKeyJwk).then((key) => {
-                  roomKeysRef.current[room.name] = key;
-                  console.log(`Imported room key for '${room.name}' from JWK:`, key);
-                  if (pendingMessagesRef.current[room.name]) {
-                    const pending = pendingMessagesRef.current[room.name];
-                    delete pendingMessagesRef.current[room.name];
-                    for (const msg of pending) {
-                      processTextMessage(msg.sender, msg.content, room.name);
-                    }
-                  }
-                });
-              }
+              // No key import for new rooms; only "general" uses encryption
               return newRooms;
             });
           }
@@ -198,8 +186,14 @@ function App() {
 
   const processTextMessage = async (sender, content, room) => {
     console.log("Processing text message:", { sender, content });
-    console.log("Using decryption key for", room, ":", roomKeysRef.current[room]);
-    const decrypted = await decryptMessage(content, roomKeysRef.current[room]);
+    let decrypted;
+    if (room === "general") {
+      console.log("Using decryption key for", room, ":", roomKeysRef.current[room]);
+      decrypted = await decryptMessage(content, roomKeysRef.current[room]);
+    } else {
+      console.log(`No encryption for '${room}', processing as plain text`);
+      decrypted = typeof content === "string" ? content : "[Invalid message format]";
+    }
     console.log("Decrypted message:", decrypted);
     const formatted = parseFormattedText(decrypted);
     setMessages((prev) => {
@@ -255,7 +249,7 @@ function App() {
       setMessages([]);
       setCurrentRoom("general");
       setRooms([{ name: "general", isPublic: true }]);
-      roomKeysRef.current = {};
+      roomKeysRef.current = { general: roomKeysRef.current.general }; // Retain only general key
     }
   };
 
@@ -275,15 +269,7 @@ function App() {
         const visibility = parts[2] || "public";
         const password = parts[3] || "";
         const isPublic = visibility === "public";
-        if (!roomKeysRef.current[roomName]) {
-          const key = await deriveRoomKey(roomName);
-          roomKeysRef.current[roomName] = key;
-          const jwkKey = await exportKey(key);
-          console.log(`Pre-derived and exported room key for '${roomName}':`, key, "JWK:", jwkKey);
-          ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password, roomKeyJwk: jwkKey }));
-        } else {
-          ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password }));
-        }
+        ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password }));
         setTimeout(() => {
           ws.send(JSON.stringify({ type: "join", room: roomName }));
           setCurrentRoom(roomName);
@@ -291,16 +277,21 @@ function App() {
         }, 500);
       } else {
         console.log("Sending message:", message, "in room:", currentRoom);
-        if (!roomKeysRef.current[currentRoom]) {
-          showPopupMessage(`No key for room '${currentRoom}', please rejoin`, "error");
-          return;
+        if (currentRoom === "general") {
+          if (!roomKeysRef.current[currentRoom]) {
+            showPopupMessage(`No key for room '${currentRoom}', please rejoin`, "error");
+            return;
+          }
+          console.log("Using encryption key for", currentRoom, ":", roomKeysRef.current[currentRoom]);
+          const encrypted = await encryptMessage(message, roomKeysRef.current[currentRoom]);
+          console.log("Encrypted message sent:", encrypted);
+          ws.send(JSON.stringify({ type: "text", content: encrypted }));
+        } else {
+          console.log(`Sending plain text for '${currentRoom}'`);
+          ws.send(JSON.stringify({ type: "text", content: message }));
         }
-        console.log("Using encryption key for", currentRoom, ":", roomKeysRef.current[currentRoom]);
-        const encrypted = await encryptMessage(message, roomKeysRef.current[currentRoom]);
-        console.log("Encrypted message sent:", encrypted);
-        ws.send(JSON.stringify({ type: "text", content: encrypted }));
+        setMessage("");
       }
-      setMessage("");
     }
   };
 
@@ -352,16 +343,28 @@ function App() {
 
       reader.onload = async () => {
         const data = reader.result;
-        const encryptedChunk = await encryptFileChunk(new Uint8Array(data), key);
-        const base64 = btoa(JSON.stringify(encryptedChunk));
-        ws.send(
-          JSON.stringify({
-            type: "file_chunk",
-            uploadId,
-            chunkIndex: i,
-            data: base64,
-          })
-        );
+        if (currentRoom === "general") {
+          const encryptedChunk = await encryptFileChunk(new Uint8Array(data), key);
+          const base64 = btoa(JSON.stringify(encryptedChunk));
+          ws.send(
+            JSON.stringify({
+              type: "file_chunk",
+              uploadId,
+              chunkIndex: i,
+              data: base64,
+            })
+          );
+        } else {
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(data)));
+          ws.send(
+            JSON.stringify({
+              type: "file_chunk",
+              uploadId,
+              chunkIndex: i,
+              data: base64,
+            })
+          );
+        }
       };
       reader.readAsArrayBuffer(chunk);
     }
@@ -378,12 +381,17 @@ function App() {
     try {
       const response = await fetch(fileUrl);
       const encryptedData = await response.arrayBuffer();
-      const decrypted = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: new Uint8Array(12) },
-        roomKeysRef.current[currentRoom],
-        encryptedData
-      );
-      const blob = new Blob([decrypted]);
+      let blob;
+      if (currentRoom === "general") {
+        const decrypted = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: new Uint8Array(12) },
+          roomKeysRef.current[currentRoom],
+          encryptedData
+        );
+        blob = new Blob([decrypted]);
+      } else {
+        blob = new Blob([encryptedData]);
+      }
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -466,7 +474,7 @@ function App() {
                           decryptAndDownloadFile(msg.fileUrl, msg.fileName);
                         }}
                       >
-                        {msg.fileName} (encrypted)
+                        {msg.fileName} {currentRoom === "general" ? "(encrypted)" : ""}
                       </a>
                     </div>
                   );
@@ -483,7 +491,7 @@ function App() {
                           decryptAndDownloadFile(msg.fileUrl, msg.fileName);
                         }}
                       >
-                        {msg.fileName} (encrypted)
+                        {msg.fileName} {currentRoom === "general" ? "(encrypted)" : ""}
                       </a>
                     </div>
                   );
