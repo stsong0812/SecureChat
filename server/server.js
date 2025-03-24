@@ -66,19 +66,6 @@ const options = isProduction
       cert: fs.readFileSync(path.join(__dirname, "cert.pem")),
     };
 
-/* 
-For prouction in insecurechat.com
-const options = {
-  key: fs.readFileSync(
-    "/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem"
-  ),
-  cert: fs.readFileSync(
-    "/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem"
-  ),
-};
-
-*/
-
 // Set up Express and HTTPS server
 const app = express();
 const server = https.createServer(options, app);
