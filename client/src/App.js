@@ -31,7 +31,10 @@ const exportKey = async (key) => {
 };
 
 const importKey = async (jwk) => {
-  return await crypto.subtle.importKey("jwk", jwk, { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
+  return await crypto.subtle.importKey("jwk", jwk, { name: "AES-GCM" }, true, [
+    "encrypt",
+    "decrypt",
+  ]);
 };
 
 const encryptMessage = async (text, key) => {
@@ -76,7 +79,10 @@ const parseFormattedText = (text) => {
   let formatted = text
     .replace(/\*(.*?)\*/g, "<b>$1</b>")
     .replace(/_(.*?)_/g, "<i>$1</i>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
   console.log("Formatted text:", formatted);
   return formatted;
 };
@@ -126,7 +132,17 @@ function App() {
         try {
           console.log("Raw WebSocket message received:", e.data);
           const data = JSON.parse(e.data);
-          const { type, message, sender, content, rooms, fileUrl, fileName, room, roomKeyJwk } = data;
+          const {
+            type,
+            message,
+            sender,
+            content,
+            rooms,
+            fileUrl,
+            fileName,
+            room,
+            roomKeyJwk,
+          } = data;
 
           console.log("Parsed message:", data);
 
@@ -136,8 +152,14 @@ function App() {
               const roomName = message.split(":")[1].trim();
               setCurrentRoom(roomName);
               setMessages([]);
-              console.log(`Switched to room '${roomName}', current keys:`, roomKeysRef.current);
-              if (roomKeysRef.current[roomName] && pendingMessagesRef.current[roomName]) {
+              console.log(
+                `Switched to room '${roomName}', current keys:`,
+                roomKeysRef.current
+              );
+              if (
+                roomKeysRef.current[roomName] &&
+                pendingMessagesRef.current[roomName]
+              ) {
                 const pending = pendingMessagesRef.current[roomName];
                 delete pendingMessagesRef.current[roomName];
                 for (const msg of pending) {
@@ -152,8 +174,13 @@ function App() {
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
-            if (currentRoom === "general" && !roomKeysRef.current[currentRoom]) {
-              console.log(`Key not ready for '${currentRoom}', queuing message`);
+            if (
+              currentRoom === "general" &&
+              !roomKeysRef.current[currentRoom]
+            ) {
+              console.log(
+                `Key not ready for '${currentRoom}', queuing message`
+              );
               if (!pendingMessagesRef.current[currentRoom]) {
                 pendingMessagesRef.current[currentRoom] = [];
               }
@@ -162,7 +189,10 @@ function App() {
               await processTextMessage(sender, content, currentRoom);
             }
           } else if (type === "file") {
-            setMessages((prev) => [...prev, { type: "file", sender, fileUrl, fileName }]);
+            setMessages((prev) => [
+              ...prev,
+              { type: "file", sender, fileUrl, fileName },
+            ]);
           } else if (type === "room_list") {
             setRooms(rooms);
           } else if (type === "new_room") {
@@ -173,7 +203,12 @@ function App() {
             });
           }
         } catch (error) {
-          console.error("Invalid message format or processing error:", error, "Raw data:", e.data);
+          console.error(
+            "Invalid message format or processing error:",
+            error,
+            "Raw data:",
+            e.data
+          );
         }
       };
 
@@ -188,16 +223,25 @@ function App() {
     console.log("Processing text message:", { sender, content });
     let decrypted;
     if (room === "general") {
-      console.log("Using decryption key for", room, ":", roomKeysRef.current[room]);
+      console.log(
+        "Using decryption key for",
+        room,
+        ":",
+        roomKeysRef.current[room]
+      );
       decrypted = await decryptMessage(content, roomKeysRef.current[room]);
     } else {
       console.log(`No encryption for '${room}', processing as plain text`);
-      decrypted = typeof content === "string" ? content : "[Invalid message format]";
+      decrypted =
+        typeof content === "string" ? content : "[Invalid message format]";
     }
     console.log("Decrypted message:", decrypted);
     const formatted = parseFormattedText(decrypted);
     setMessages((prev) => {
-      const newMessages = [...prev, { type: "text", content: `${sender}: ${formatted}` }];
+      const newMessages = [
+        ...prev,
+        { type: "text", content: `${sender}: ${formatted}` },
+      ];
       console.log("Updated messages state:", newMessages);
       return newMessages;
     });
@@ -211,8 +255,16 @@ function App() {
   };
 
   const validateInputs = () => {
-    if (!username || username.length < 3 || username.length > 20 || !/^[a-zA-Z0-9_]+$/.test(username)) {
-      showPopupMessage("Username must be 3-20 alphanumeric characters", "error");
+    if (
+      !username ||
+      username.length < 3 ||
+      username.length > 20 ||
+      !/^[a-zA-Z0-9_]+$/.test(username)
+    ) {
+      showPopupMessage(
+        "Username must be 3-20 alphanumeric characters",
+        "error"
+      );
       return false;
     }
     if (!password || password.length < 6) {
@@ -262,14 +314,19 @@ function App() {
       if (message.startsWith("/create ")) {
         const parts = message.split(" ");
         if (parts.length < 2) {
-          showPopupMessage("Usage: /create roomName [public|private] [password]", "error");
+          showPopupMessage(
+            "Usage: /create roomName [public|private] [password]",
+            "error"
+          );
           return;
         }
         const roomName = parts[1];
         const visibility = parts[2] || "public";
         const password = parts[3] || "";
         const isPublic = visibility === "public";
-        ws.send(JSON.stringify({ type: "create_room", roomName, isPublic, password }));
+        ws.send(
+          JSON.stringify({ type: "create_room", roomName, isPublic, password })
+        );
         setTimeout(() => {
           ws.send(JSON.stringify({ type: "join", room: roomName }));
           setCurrentRoom(roomName);
@@ -279,11 +336,22 @@ function App() {
         console.log("Sending message:", message, "in room:", currentRoom);
         if (currentRoom === "general") {
           if (!roomKeysRef.current[currentRoom]) {
-            showPopupMessage(`No key for room '${currentRoom}', please rejoin`, "error");
+            showPopupMessage(
+              `No key for room '${currentRoom}', please rejoin`,
+              "error"
+            );
             return;
           }
-          console.log("Using encryption key for", currentRoom, ":", roomKeysRef.current[currentRoom]);
-          const encrypted = await encryptMessage(message, roomKeysRef.current[currentRoom]);
+          console.log(
+            "Using encryption key for",
+            currentRoom,
+            ":",
+            roomKeysRef.current[currentRoom]
+          );
+          const encrypted = await encryptMessage(
+            message,
+            roomKeysRef.current[currentRoom]
+          );
           console.log("Encrypted message sent:", encrypted);
           ws.send(JSON.stringify({ type: "text", content: encrypted }));
         } else {
@@ -314,7 +382,13 @@ function App() {
       return;
     }
     console.log("Joining private room:", selectedRoom);
-    ws.send(JSON.stringify({ type: "join", room: selectedRoom, password: passwordInput }));
+    ws.send(
+      JSON.stringify({
+        type: "join",
+        room: selectedRoom,
+        password: passwordInput,
+      })
+    );
     setShowPasswordInput(false);
     setPasswordInput("");
   };
@@ -344,7 +418,10 @@ function App() {
       reader.onload = async () => {
         const data = reader.result;
         if (currentRoom === "general") {
-          const encryptedChunk = await encryptFileChunk(new Uint8Array(data), key);
+          const encryptedChunk = await encryptFileChunk(
+            new Uint8Array(data),
+            key
+          );
           const base64 = btoa(JSON.stringify(encryptedChunk));
           ws.send(
             JSON.stringify({
@@ -416,14 +493,27 @@ function App() {
       {!loggedIn ? (
         <div className="login">
           <div className="prompt">
-            username: <input value={username} onChange={(e) => setUsername(e.target.value)} />
+            username:{" "}
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
           </div>
           <div className="prompt">
-            password: <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            password:{" "}
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </div>
           <div className="commands">
-            <span className="command" onClick={register}>register</span>
-            <span className="command" onClick={login}>login</span>
+            <span className="command" onClick={register}>
+              register
+            </span>
+            <span className="command" onClick={login}>
+              login
+            </span>
           </div>
         </div>
       ) : (
@@ -474,7 +564,8 @@ function App() {
                           decryptAndDownloadFile(msg.fileUrl, msg.fileName);
                         }}
                       >
-                        {msg.fileName} {currentRoom === "general" ? "(encrypted)" : ""}
+                        {msg.fileName}{" "}
+                        {currentRoom === "general" ? "(encrypted)" : ""}
                       </a>
                     </div>
                   );
@@ -491,7 +582,8 @@ function App() {
                           decryptAndDownloadFile(msg.fileUrl, msg.fileName);
                         }}
                       >
-                        {msg.fileName} {currentRoom === "general" ? "(encrypted)" : ""}
+                        {msg.fileName}{" "}
+                        {currentRoom === "general" ? "(encrypted)" : ""}
                       </a>
                     </div>
                   );
@@ -509,8 +601,15 @@ function App() {
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
             />
-            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>🤫</button>
-            <input type="file" style={{ display: "none" }} ref={fileInputRef} onChange={handleFileSelect} />
+            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+              🤫
+            </button>
+            <input
+              type="file"
+              style={{ display: "none" }}
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+            />
             <button onClick={() => fileInputRef.current.click()}>📁</button>
             {showEmojiPicker && (
               <div className="emoji-picker">
