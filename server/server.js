@@ -9,7 +9,7 @@ const path = require("path");
 
 // Configuration from .env
 const PORT = process.env.PORT || 7777;
-const dbPath = process.env.DB_PATH;
+const dbPath = process.env.DB_PATH || '/app/db/securechat.db';
 const dbKey = process.env.SECRET_KEY;
 
 // Validate environment variables
@@ -20,12 +20,10 @@ if (!dbPath || !dbKey) {
 }
 
 if (!fs.existsSync(dbPath)) {
-  throw new Error(
-    `Database not found at ${dbPath}. Please run auth-db.js first.`
-  );
+  console.error(`Database not found at ${dbPath}. Please ensure auth-db.js runs during deployment.`);
+  process.exit(1);
 }
 
-// Initialize SQLite database
 const db = new Database(dbPath);
 db.pragma(`key = "${dbKey}"`);
 
