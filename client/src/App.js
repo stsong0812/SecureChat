@@ -114,11 +114,9 @@ function App() {
       roomKeysRef.current = { general: generalKey };
       console.log("Initial room key set for 'general':", generalKey);
 
-      const websocket = new WebSocket("wss://localhost:7777");
-      websocket.onopen = () => {
-        console.log("WebSocket connection established");
-        setIsConnected(true);
-      };
+      const websocket = new WebSocket(
+        process.env.REACT_APP_WS_URL || 'wss://localhost:7777'
+      );
       websocket.onerror = (error) => {
         console.error("WebSocket error:", error);
         setIsConnected(false);

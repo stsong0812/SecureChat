@@ -51,16 +51,8 @@ if (!fs.existsSync(logsDir)) {
 
 // Load SSL/TLS certificates
 const isProduction = process.env.NODE_ENV === "production";
-
 const options = isProduction
-  ? {
-      key: fs.readFileSync(
-        "/etc/letsencrypt/live/insecurechat.com-0001/privkey.pem"
-      ),
-      cert: fs.readFileSync(
-        "/etc/letsencrypt/live/insecurechat.com-0001/fullchain.pem"
-      ),
-    }
+  ? {} // Render handles SSL, no need for certificates
   : {
       key: fs.readFileSync(path.join(__dirname, "key.pem")),
       cert: fs.readFileSync(path.join(__dirname, "cert.pem")),
@@ -463,5 +455,5 @@ function broadcastToAll(message) {
 
 // Start the server
 server.listen(PORT, () => {
-  console.log(`Secure server running on https://localhost:${PORT}`);
+  console.log(`Secure server running on ${process.env.NODE_ENV === 'production' ? `0.0.0.0:${PORT}` : `localhost:${PORT}`}`);
 });

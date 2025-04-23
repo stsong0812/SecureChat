@@ -1,6 +1,16 @@
+# Node.js
 node_modules/
-.env
-securechat.db
-*.pem
-server/logs/*
-server/uploads/*
+npm-debug.log
+yarn-error.log
+
+# Sensitive files
+server/.env
+server/securechat.db
+server/key.pem
+server/cert.pem
+
+# Build artifacts
+client/build/
+
+# Miscellaneous
+.DS_Store
