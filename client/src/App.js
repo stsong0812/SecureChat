@@ -45,6 +45,7 @@ const encryptMessage = async (text, key) => {
   const encrypted = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
+a
     encoder.encode(text)
   );
   return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
@@ -141,7 +142,6 @@ function App() {
             fileUrl,
             fileName,
             room,
-            // roomKeyJwk, // Removed: unused variable
           } = data;
 
           console.log("Parsed message:", data);
@@ -217,7 +217,7 @@ function App() {
     };
 
     initializeKeysAndWebSocket();
-    // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const processTextMessage = async (sender, content, room) => {
