@@ -26,10 +26,12 @@ const deriveRoomKey = async (roomName) => {
   );
 };
 
+// eslint-disable-next-line no-unused-vars
 const exportKey = async (key) => {
   return await crypto.subtle.exportKey("jwk", key);
 };
 
+// eslint-disable-next-line no-unused-vars
 const importKey = async (jwk) => {
   return await crypto.subtle.importKey("jwk", jwk, { name: "AES-GCM" }, true, [
     "encrypt",
@@ -139,7 +141,7 @@ function App() {
             fileUrl,
             fileName,
             room,
-            roomKeyJwk,
+            // roomKeyJwk, // Removed: unused variable
           } = data;
 
           console.log("Parsed message:", data);
@@ -215,6 +217,7 @@ function App() {
     };
 
     initializeKeysAndWebSocket();
+    // eslint-disable-line react-hooks/exhaustive-deps
   }, []);
 
   const processTextMessage = async (sender, content, room) => {
@@ -555,16 +558,15 @@ function App() {
                       <div>
                         <strong>{msg.sender}</strong>:
                       </div>
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          decryptAndDownloadFile(msg.fileUrl, msg.fileName);
-                        }}
+                      <button
+                        className="file-link"
+                        onClick={() =>
+                          decryptAndDownloadFile(msg.fileUrl, msg.fileName)
+                        }
                       >
                         {msg.fileName}{" "}
                         {currentRoom === "general" ? "(encrypted)" : ""}
-                      </a>
+                      </button>
                     </div>
                   );
                 } else {
@@ -573,16 +575,15 @@ function App() {
                       <div>
                         <strong>{msg.sender}</strong>:
                       </div>
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          decryptAndDownloadFile(msg.fileUrl, msg.fileName);
-                        }}
+                      <button
+                        className="file-link"
+                        onClick={() =>
+                          decryptAndDownloadFile(msg.fileUrl, msg.fileName)
+                        }
                       >
                         {msg.fileName}{" "}
                         {currentRoom === "general" ? "(encrypted)" : ""}
-                      </a>
+                      </button>
                     </div>
                   );
                 }
