@@ -43,11 +43,10 @@ const encryptMessage = async (text, key) => {
   const encoder = new TextEncoder();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-a
-    encoder.encode(text)
-  );
+  { name: "AES-GCM", iv },
+  key,
+  encoder.encode(text)
+);
   return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
 };
 
