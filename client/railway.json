@@ -2,11 +2,13 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build",
-    "outputDirectory": "build"
+    "buildCommand": "npm install && npm run build"
   },
   "deploy": {
-    "startCommand": null,
-    "restartPolicy": "NEVER"
+    "startCommand": "npx serve -s build",
+    "port": 3000,
+    "restartPolicy": {
+      "type": "always"
+    }
   }
 }
