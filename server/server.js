@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const https = require('https');
+const http = require('http'); // Changed from https
 const WebSocket = require('ws');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
@@ -100,24 +100,20 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
 
-// SSL/TLS configuration
-const isProduction = process.env.NODE_ENV === 'production';
-const options = isProduction
-  ? {}
-  : {
-      key: fs.readFileSync(path.join(__dirname, 'key.pem')),
-      cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
-    };
-
-// Set up Express and HTTPS server
+// Set up Express and HTTP server
 const app = express();
-const server = https.createServer(options, app);
+const server = http.createServer(app); // Changed from https
 const wss = new WebSocket.Server({ server });
+
+// Healthcheck endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', port: PORT });
+});
 
 // Serve static files for uploads
 app.use('/Uploads', express.static(uploadsDir));
 
-// Serve static files from the React app (optional, if backend serves frontend)
+// Serve static files from the React app (optional)
 app.use(express.static(path.join(__dirname, '../client/build')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
@@ -161,8 +157,12 @@ function logMessage(room, sender, content, isFile = false, fileUrl = '') {
 const clients = new Map();
 
 // WebSocket connection handling
+wss.on('error', (error) => {
+  console.error('WebSocket server error:', error);
+});
+
 wss.on('connection', (socket) => {
-  console.log('Client connected');
+  console.log('Client connected from:', socket._socket.remoteAddress);
   socket.authenticated = false;
   socket.room = 'general';
 
@@ -171,6 +171,7 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('message', (message) => {
+    console.log('Received message from:', socket._socket.remoteAddress, message.toString());
     let data;
     try {
       data = JSON.parse(message.toString());
@@ -421,10 +422,10 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
+    console.log('Client disconnected from:', socket._socket.remoteAddress);
     for (let [username, client] of clients) {
       if (client === socket) clients.delete(username);
     }
-    console.log('Client disconnected');
   });
 });
 
@@ -507,12 +508,8 @@ function broadcastToAll(message) {
   });
 }
 
-// WebSocket server error handling
-wss.on('error', (error) => {
-  console.error('WebSocket server error:', error);
-});
-
 // Start the server
-server.listen(PORT, () => {
-  console.log(`Secure server running on port ${PORT} (public: https://${publicDomain})`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} (public: https://${publicDomain})`);
+  console.log('WebSocket server initialized at wss://' + publicDomain);
 });
