@@ -12,6 +12,7 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^10.0.1",
     "react-scripts": "5.0.1",
+    "serve": "^14.2.3",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -38,8 +39,9 @@
       "last 1 safari version"
     ]
   },
+  "homepage": "https://securechat-production-0040.up.railway.app",
   "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
-  "main": "client.js",
+  "main": "index.js",
   "keywords": [],
   "author": "",
   "license": "ISC"
