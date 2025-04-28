@@ -7,8 +7,15 @@ const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 
+// Configuration from .env
+const PORT = process.env.PORT || 7777;
+const dbPath = process.env.DB_PATH || '/app/db/securechat.db';
+const dbKey = process.env.SECRET_KEY;
+const publicDomain = process.env.PUBLIC_DOMAIN || 'securechat-production-6fc4.up.railway.app';
+
 // Validate environment variables
 if (!dbPath || !dbKey) {
+  console.error('Environment variables missing:', { dbPath, dbKey });
   throw new Error('Missing database path or encryption key in environment variables');
 }
 
@@ -63,8 +70,15 @@ if (!fs.existsSync(dbPath)) {
 }
 
 // Initialize SQLite database for runtime use
-const db = new Database(dbPath);
-db.pragma(`key = "${dbKey}"`);
+let db;
+try {
+  db = new Database(dbPath);
+  db.pragma(`key = "${dbKey}"`);
+  console.log('Database opened successfully');
+} catch (error) {
+  console.error('Failed to open database:', error);
+  throw error;
+}
 
 // Rate limiting configuration
 const LOGIN_LIMIT = 5;
@@ -89,7 +103,7 @@ if (!fs.existsSync(logsDir)) {
 // SSL/TLS configuration
 const isProduction = process.env.NODE_ENV === 'production';
 const options = isProduction
-  ? {} // Railway handles SSL
+  ? {}
   : {
       key: fs.readFileSync(path.join(__dirname, 'key.pem')),
       cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
@@ -100,15 +114,14 @@ const app = express();
 const server = https.createServer(options, app);
 const wss = new WebSocket.Server({ server });
 
-// Serve static files from the React app
-app.use(express.static(path.join(__dirname, '../client/build')));
+// Serve static files for uploads
+app.use('/Uploads', express.static(uploadsDir));
 
-// Handle React routing
+// Serve static files from the React app (optional, if backend serves frontend)
+app.use(express.static(path.join(__dirname, '../client/build')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
-
-app.use('/uploads', express.static(uploadsDir));
 
 // Rate limiting function
 function checkRateLimit(key, limit, window, trackingObject) {
@@ -151,7 +164,11 @@ const clients = new Map();
 wss.on('connection', (socket) => {
   console.log('Client connected');
   socket.authenticated = false;
-  socket.room = 'general'; // Default room
+  socket.room = 'general';
+
+  socket.on('error', (error) => {
+    console.error('WebSocket client error:', error);
+  });
 
   socket.on('message', (message) => {
     let data;
@@ -490,7 +507,12 @@ function broadcastToAll(message) {
   });
 }
 
+// WebSocket server error handling
+wss.on('error', (error) => {
+  console.error('WebSocket server error:', error);
+});
+
 // Start the server
 server.listen(PORT, () => {
-  console.log(`Secure server running on https://0.0.0.0:${PORT}`);
+  console.log(`Secure server running on port ${PORT} (public: https://${publicDomain})`);
 });
