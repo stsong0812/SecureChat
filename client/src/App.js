@@ -111,109 +111,112 @@ function App() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const initializeKeysAndWebSocket = async () => {
-      const generalKey = await deriveRoomKey("general");
-      roomKeysRef.current = { general: generalKey };
-      console.log("Initial room key set for 'general':", generalKey);
+  const initializeKeysAndWebSocket = async () => {
+    const generalKey = await deriveRoomKey("general");
+    roomKeysRef.current = { general: generalKey };
+    console.log("Initial room key set for 'general':", generalKey);
 
-      const websocket = new WebSocket(
-        process.env.REACT_APP_WS_URL || 'wss://localhost:7777'
-      );
-      websocket.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setIsConnected(false);
-      };
-      websocket.onclose = () => {
-        console.log("WebSocket connection closed");
-        setIsConnected(false);
-        setLoggedIn(false);
-      };
-      websocket.onmessage = async (e) => {
-        try {
-          console.log("Raw WebSocket message received:", e.data);
-          const data = JSON.parse(e.data);
-          const {
-            type,
-            message,
-            sender,
-            content,
-            rooms,
-            fileUrl,
-            fileName,
-            room,
-          } = data;
-
-          console.log("Parsed message:", data);
-
-          if (type === "status") {
-            showPopupMessage(message, "success");
-            if (message.startsWith("Joined room:")) {
-              const roomName = message.split(":")[1].trim();
-              setCurrentRoom(roomName);
-              setMessages([]);
-              console.log(
-                `Switched to room '${roomName}', current keys:`,
-                roomKeysRef.current
-              );
-              if (
-                roomKeysRef.current[roomName] &&
-                pendingMessagesRef.current[roomName]
-              ) {
-                const pending = pendingMessagesRef.current[roomName];
-                delete pendingMessagesRef.current[roomName];
-                for (const msg of pending) {
-                  await processTextMessage(msg.sender, msg.content, roomName);
-                }
-              }
-            } else if (message === "Logged in successfully") {
-              setLoggedIn(true);
-              websocket.send(JSON.stringify({ type: "get_rooms" }));
-              setCurrentRoom("general");
-            }
-          } else if (type === "error") {
-            showPopupMessage(message, "error");
-          } else if (type === "text") {
-            if (
-              currentRoom === "general" &&
-              !roomKeysRef.current[currentRoom]
-            ) {
-              console.log(
-                `Key not ready for '${currentRoom}', queuing message`
-              );
-              if (!pendingMessagesRef.current[currentRoom]) {
-                pendingMessagesRef.current[currentRoom] = [];
-              }
-              pendingMessagesRef.current[currentRoom].push({ sender, content });
-            } else {
-              await processTextMessage(sender, content, currentRoom);
-            }
-          } else if (type === "file") {
-            setMessages((prev) => [
-              ...prev,
-              { type: "file", sender, fileUrl, fileName },
-            ]);
-          } else if (type === "room_list") {
-            setRooms(rooms);
-          } else if (type === "new_room") {
-            setRooms((prevRooms) => {
-              const newRooms = [...prevRooms, room];
-              // No key import for new rooms; only "general" uses encryption
-              return newRooms;
-            });
-          }
-        } catch (error) {
-          console.error(
-            "Invalid message format or processing error:",
-            error,
-            "Raw data:",
-            e.data
-          );
-        }
-      };
-
-      setWs(websocket);
-      return () => websocket.close();
+    const wsUrl = process.env.REACT_APP_WS_URL || 'wss://localhost:7777';
+    console.log("Connecting to WebSocket URL:", wsUrl); // Debug log
+    const websocket = new WebSocket(wsUrl);
+    websocket.onopen = () => {
+      console.log("WebSocket connected");
+      setIsConnected(true); // Set connection status
     };
+    websocket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setIsConnected(false);
+    };
+    websocket.onclose = () => {
+      console.log("WebSocket connection closed");
+      setIsConnected(false);
+      setLoggedIn(false);
+    };
+    websocket.onmessage = async (e) => {
+      try {
+        console.log("Raw WebSocket message received:", e.data);
+        const data = JSON.parse(e.data);
+        const {
+          type,
+          message,
+          sender,
+          content,
+          rooms,
+          fileUrl,
+          fileName,
+          room,
+        } = data;
+
+        console.log("Parsed message:", data);
+
+        if (type === "status") {
+          showPopupMessage(message, "success");
+          if (message.startsWith("Joined room:")) {
+            const roomName = message.split(":")[1].trim();
+            setCurrentRoom(roomName);
+            setMessages([]);
+            console.log(
+              `Switched to room '${roomName}', current keys:`,
+              roomKeysRef.current
+            );
+            if (
+              roomKeysRef.current[roomName] &&
+              pendingMessagesRef.current[roomName]
+            ) {
+              const pending = pendingMessagesRef.current[roomName];
+              delete pendingMessagesRef.current[roomName];
+              for (const msg of pending) {
+                await processTextMessage(msg.sender, msg.content, roomName);
+              }
+            }
+          } else if (message === "Logged in successfully") {
+            setLoggedIn(true);
+            websocket.send(JSON.stringify({ type: "get_rooms" }));
+            setCurrentRoom("general");
+          }
+        } else if (type === "error") {
+          showPopupMessage(message, "error");
+        } else if (type === "text") {
+          if (
+            currentRoom === "general" &&
+            !roomKeysRef.current[currentRoom]
+          ) {
+            console.log(
+              `Key not ready for '${currentRoom}', queuing message`
+            );
+            if (!pendingMessagesRef.current[currentRoom]) {
+              pendingMessagesRef.current[currentRoom] = [];
+            }
+            pendingMessagesRef.current[currentRoom].push({ sender, content });
+          } else {
+            await processTextMessage(sender, content, currentRoom);
+          }
+        } else if (type === "file") {
+          setMessages((prev) => [
+            ...prev,
+            { type: "file", sender, fileUrl, fileName },
+          ]);
+        } else if (type === "room_list") {
+          setRooms(rooms);
+        } else if (type === "new_room") {
+          setRooms((prevRooms) => {
+            const newRooms = [...prevRooms, room];
+            return newRooms;
+          });
+        }
+      } catch (error) {
+        console.error(
+          "Invalid message format or processing error:",
+          error,
+          "Raw data:",
+          e.data
+        );
+      }
+    };
+
+    setWs(websocket);
+    return () => websocket.close();
+  };
 
     initializeKeysAndWebSocket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
