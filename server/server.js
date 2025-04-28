@@ -7,11 +7,6 @@ const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration from .env
-const PORT = process.env.PORT || 7777;
-const dbPath = process.env.DB_PATH || '/app/db/securechat.db';
-const dbKey = process.env.SECRET_KEY;
-
 // Validate environment variables
 if (!dbPath || !dbKey) {
   throw new Error('Missing database path or encryption key in environment variables');
