@@ -380,15 +380,18 @@ wss.on("connection", (socket) => {
       if (socket.authenticated) {
         const { uploadId, chunkIndex, data: chunkData } = data;
         const upload = uploads[uploadId];
+
         if (upload) {
+          console.log("File chunk received:", uploadId, "chunk", chunkIndex);
           const decodedChunk = JSON.parse(atob(chunkData));
           upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
           upload.receivedChunks++;
 
           if (upload.receivedChunks === upload.totalChunks) {
+            console.log(" Starting encryption for:", upload.fileName);
             const fileBuffer = Buffer.concat(upload.chunks);
 
-            // ✅ AES-256-GCM Encryption
+            //  AES-256-GCM Encryption
             const aesKey = crypto.randomBytes(32);
             const iv = crypto.randomBytes(12);
             const cipher = crypto.createCipheriv("aes-256-gcm", aesKey, iv);
@@ -398,11 +401,21 @@ wss.on("connection", (socket) => {
             ]);
             const authTag = cipher.getAuthTag();
 
+            const uploadsDir =
+              process.env.NODE_ENV === "production"
+                ? path.join("/tmp", "Uploads")
+                : path.join(__dirname, "Uploads");
+
+            if (!fs.existsSync(uploadsDir)) {
+              fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+
             const uniqueFileName = `${uploadId}_${upload.fileName}.enc`;
             const filePath = path.join(uploadsDir, uniqueFileName);
             fs.writeFileSync(filePath, encrypted);
             const fileUrl = `/Uploads/${uniqueFileName}`;
 
+            console.log("Inserting file into DB:", fileUrl);
             db.prepare(
               `
               INSERT INTO files 
@@ -435,17 +448,21 @@ wss.on("connection", (socket) => {
             );
             broadcast(socket.room, broadcastMsg);
             delete uploads[uploadId];
+
+            console.log("File encrypted and saved:", uniqueFileName);
           } else {
             socket.send(
               JSON.stringify({ type: "status", message: "Chunk received" })
             );
           }
         } else {
+          console.log("Invalid upload ID:", uploadId);
           socket.send(
             JSON.stringify({ type: "error", message: "Invalid upload ID" })
           );
         }
       } else {
+        console.log("Unauthenticated attempt to upload file chunk");
         socket.send(
           JSON.stringify({ type: "error", message: "Please log in first" })
         );
