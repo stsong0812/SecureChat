@@ -85,6 +85,21 @@ try {
   throw error;
 }
 
+db = new Database(dbPath);
+db.pragma(`key = "${dbKey}"`);
+console.log("Database opened successfully");
+
+try {
+  db.prepare("SELECT aesKey, iv, authTag FROM files LIMIT 1").get();
+} catch (e) {
+  console.warn("Adding missing encryption columns to 'files' table...");
+  db.exec(`
+    ALTER TABLE files ADD COLUMN aesKey TEXT;
+    ALTER TABLE files ADD COLUMN iv TEXT;
+    ALTER TABLE files ADD COLUMN authTag TEXT;
+  `);
+}
+
 // Rate limiting configuration
 const LOGIN_LIMIT = 5;
 const LOGIN_WINDOW = 60 * 1000; // 1 minute
