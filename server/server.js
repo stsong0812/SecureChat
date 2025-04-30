@@ -76,19 +76,16 @@ if (!fs.existsSync(dbPath)) {
 
 // Initialize SQLite database for runtime use
 // Initialize SQLite database for runtime use
-let db;
+let db; // Declare db at the top
+
 try {
-  db = new Database(dbPath);
+  db = new Database(dbPath); // Then assign it here
   db.pragma(`key = "${dbKey}"`);
   console.log("Database opened successfully");
 } catch (error) {
   console.error("Failed to open database:", error);
   throw error;
 }
-
-db = new Database(dbPath);
-db.pragma(`key = "${dbKey}"`);
-console.log("Database opened successfully");
 
 try {
   db.prepare("SELECT aesKey, iv, authTag FROM files LIMIT 1").get();
@@ -468,6 +465,7 @@ wss.on("connection", (socket) => {
             JSON.stringify({ type: "error", message: "File upload failed" })
           );
         }
+      } else {
         socket.send(
           JSON.stringify({ type: "error", message: "Please log in first" })
         );
