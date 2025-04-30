@@ -380,32 +380,40 @@ wss.on("connection", (socket) => {
           const decodedChunk = JSON.parse(atob(chunkData));
           upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
           upload.receivedChunks++;
+
           if (upload.receivedChunks === upload.totalChunks) {
             const fileBuffer = Buffer.concat(upload.chunks);
 
-            // AES 256 encryption
-            const aesKey = crypto.randomBytes(32); // 256 bits key
-            const iv = crypto.randomBytes(12); //
-            const cipher = cyrpto.createCipheriv("aes-256-gcm", aesKey, iv);
+            // ✅ AES-256-GCM Encryption
+            const aesKey = crypto.randomBytes(32);
+            const iv = crypto.randomBytes(12);
+            const cipher = crypto.createCipheriv("aes-256-gcm", aesKey, iv);
             const encrypted = Buffer.concat([
               cipher.update(fileBuffer),
               cipher.final(),
             ]);
             const authTag = cipher.getAuthTag();
 
-            const uniqueFileName = `${uploadId}_${upload.fileName}`;
+            const uniqueFileName = `${uploadId}_${upload.fileName}.enc`;
             const filePath = path.join(uploadsDir, uniqueFileName);
-            fs.writeFileSync(filePath, fileBuffer);
+            fs.writeFileSync(filePath, encrypted);
             const fileUrl = `/Uploads/${uniqueFileName}`;
 
             db.prepare(
-              "INSERT INTO files (room, sender, fileUrl, fileName, timestamp) VALUES (?, ?, ?, ?, ?)"
+              `
+              INSERT INTO files 
+              (room, sender, fileUrl, fileName, timestamp, aesKey, iv, authTag)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `
             ).run(
               socket.room,
               socket.username,
               fileUrl,
               upload.fileName,
-              Date.now()
+              Date.now(),
+              aesKey.toString("hex"),
+              iv.toString("hex"),
+              authTag.toString("hex")
             );
 
             const broadcastMsg = {
