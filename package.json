@@ -4,8 +4,7 @@
   "description": "CPSC-455 Web Application Security: Web-based realtime chatting application implemented using Websockets.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-    ,
+    "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "cd client && npm install && npm run build"
   },
   "repository": {
@@ -26,6 +25,7 @@
     "dotenv": "^16.4.7",
     "emoji-picker-react": "^4.12.2",
     "express": "^4.21.2",
+    "server": "^1.0.41",
     "sqlite3": "^5.1.7",
     "ws": "^8.18.1"
   }
