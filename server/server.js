@@ -75,6 +75,7 @@ if (!fs.existsSync(dbPath)) {
 }
 
 // Initialize SQLite database for runtime use
+// Initialize SQLite database for runtime use
 let db;
 try {
   db = new Database(dbPath);
@@ -393,91 +394,80 @@ wss.on("connection", (socket) => {
       }
     } else if (type === "file_chunk") {
       if (socket.authenticated) {
-        const { uploadId, chunkIndex, data: chunkData } = data;
-        const upload = uploads[uploadId];
+        try {
+          const { uploadId, chunkIndex, data: chunkData } = data;
+          const upload = uploads[uploadId];
 
-        if (upload) {
-          console.log("File chunk received:", uploadId, "chunk", chunkIndex);
-          const decodedChunk = JSON.parse(atob(chunkData));
-          upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
-          upload.receivedChunks++;
+          if (upload) {
+            const decodedChunk = JSON.parse(atob(chunkData));
+            upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
+            upload.receivedChunks++;
 
-          if (upload.receivedChunks === upload.totalChunks) {
-            console.log(" Starting encryption for:", upload.fileName);
-            const fileBuffer = Buffer.concat(upload.chunks);
+            if (upload.receivedChunks === upload.totalChunks) {
+              const fileBuffer = Buffer.concat(upload.chunks);
 
-            //  AES-256-GCM Encryption
-            const aesKey = crypto.randomBytes(32);
-            const iv = crypto.randomBytes(12);
-            const cipher = crypto.createCipheriv("aes-256-gcm", aesKey, iv);
-            const encrypted = Buffer.concat([
-              cipher.update(fileBuffer),
-              cipher.final(),
-            ]);
-            const authTag = cipher.getAuthTag();
+              const aesKey = crypto.randomBytes(32);
+              const iv = crypto.randomBytes(12);
+              const cipher = crypto.createCipheriv("aes-256-gcm", aesKey, iv);
+              const encrypted = Buffer.concat([
+                cipher.update(fileBuffer),
+                cipher.final(),
+              ]);
+              const authTag = cipher.getAuthTag();
 
-            const uploadsDir =
-              process.env.NODE_ENV === "production"
-                ? path.join("/tmp", "Uploads")
-                : path.join(__dirname, "Uploads");
+              const uniqueFileName = `${uploadId}_${upload.fileName}.enc`;
+              const filePath = path.join(uploadsDir, uniqueFileName);
+              fs.writeFileSync(filePath, encrypted);
+              const fileUrl = `/Uploads/${uniqueFileName}`;
 
-            if (!fs.existsSync(uploadsDir)) {
-              fs.mkdirSync(uploadsDir, { recursive: true });
-            }
-
-            const uniqueFileName = `${uploadId}_${upload.fileName}.enc`;
-            const filePath = path.join(uploadsDir, uniqueFileName);
-            fs.writeFileSync(filePath, encrypted);
-            const fileUrl = `/Uploads/${uniqueFileName}`;
-
-            console.log("Inserting file into DB:", fileUrl);
-            db.prepare(
+              db.prepare(
+                `
+                INSERT INTO files 
+                (room, sender, fileUrl, fileName, timestamp, aesKey, iv, authTag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
               `
-              INSERT INTO files 
-              (room, sender, fileUrl, fileName, timestamp, aesKey, iv, authTag)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `
-            ).run(
-              socket.room,
-              socket.username,
-              fileUrl,
-              upload.fileName,
-              Date.now(),
-              aesKey.toString("hex"),
-              iv.toString("hex"),
-              authTag.toString("hex")
-            );
+              ).run(
+                socket.room,
+                socket.username,
+                fileUrl,
+                upload.fileName,
+                Date.now(),
+                aesKey.toString("hex"),
+                iv.toString("hex"),
+                authTag.toString("hex")
+              );
 
-            const broadcastMsg = {
-              type: "file",
-              sender: socket.username,
-              fileUrl,
-              fileName: upload.fileName,
-            };
-            logMessage(
-              socket.room,
-              socket.username,
-              upload.fileName,
-              true,
-              fileUrl
-            );
-            broadcast(socket.room, broadcastMsg);
-            delete uploads[uploadId];
-
-            console.log("File encrypted and saved:", uniqueFileName);
+              const broadcastMsg = {
+                type: "file",
+                sender: socket.username,
+                fileUrl,
+                fileName: upload.fileName,
+              };
+              logMessage(
+                socket.room,
+                socket.username,
+                upload.fileName,
+                true,
+                fileUrl
+              );
+              broadcast(socket.room, broadcastMsg);
+              delete uploads[uploadId];
+            } else {
+              socket.send(
+                JSON.stringify({ type: "status", message: "Chunk received" })
+              );
+            }
           } else {
             socket.send(
-              JSON.stringify({ type: "status", message: "Chunk received" })
+              JSON.stringify({ type: "error", message: "Invalid upload ID" })
             );
           }
-        } else {
-          console.log("Invalid upload ID:", uploadId);
+        } catch (err) {
+          console.error("File upload failed:", err);
           socket.send(
-            JSON.stringify({ type: "error", message: "Invalid upload ID" })
+            JSON.stringify({ type: "error", message: "File upload failed" })
           );
         }
-      } else {
-        console.log("Unauthenticated attempt to upload file chunk");
         socket.send(
           JSON.stringify({ type: "error", message: "Please log in first" })
         );
