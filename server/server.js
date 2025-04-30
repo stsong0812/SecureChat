@@ -1,22 +1,26 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http'); // Changed from https
-const WebSocket = require('ws');
-const Database = require('better-sqlite3');
-const bcrypt = require('bcrypt');
-const fs = require('fs');
-const path = require('path');
+require("dotenv").config();
+const express = require("express");
+const http = require("http"); // Changed from https
+const WebSocket = require("ws");
+const Database = require("better-sqlite3");
+const bcrypt = require("bcrypt");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 
 // Configuration from .env
 const PORT = process.env.PORT || 7777;
-const dbPath = process.env.DB_PATH || '/app/db/securechat.db';
+const dbPath = process.env.DB_PATH || "/app/db/securechat.db";
 const dbKey = process.env.SECRET_KEY;
-const publicDomain = process.env.PUBLIC_DOMAIN || 'securechat-production-6fc4.up.railway.app';
+const publicDomain =
+  process.env.PUBLIC_DOMAIN || "securechat-production-6fc4.up.railway.app";
 
 // Validate environment variables
 if (!dbPath || !dbKey) {
-  console.error('Environment variables missing:', { dbPath, dbKey });
-  throw new Error('Missing database path or encryption key in environment variables');
+  console.error("Environment variables missing:", { dbPath, dbKey });
+  throw new Error(
+    "Missing database path or encryption key in environment variables"
+  );
 }
 
 // Initialize database
@@ -62,8 +66,9 @@ if (!fs.existsSync(dbPath)) {
     );
   `);
 
-  db.prepare("INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)")
-    .run("general", 1, null, null);
+  db.prepare(
+    "INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)"
+  ).run("general", 1, null, null);
 
   console.log('Database initialized with "general" room');
   db.close();
@@ -74,9 +79,9 @@ let db;
 try {
   db = new Database(dbPath);
   db.pragma(`key = "${dbKey}"`);
-  console.log('Database opened successfully');
+  console.log("Database opened successfully");
 } catch (error) {
-  console.error('Failed to open database:', error);
+  console.error("Failed to open database:", error);
   throw error;
 }
 
@@ -91,8 +96,8 @@ const messageCounts = {};
 const uploads = {};
 
 // Create uploads and logs directories
-const uploadsDir = path.join(__dirname, 'Uploads');
-const logsDir = path.join(__dirname, 'logs');
+const uploadsDir = path.join(__dirname, "Uploads");
+const logsDir = path.join(__dirname, "logs");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
@@ -106,17 +111,17 @@ const server = http.createServer(app); // Changed from https
 const wss = new WebSocket.Server({ server });
 
 // Healthcheck endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', port: PORT });
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", port: PORT });
 });
 
 // Serve static files for uploads
-app.use('/Uploads', express.static(uploadsDir));
+app.use("/Uploads", express.static(uploadsDir));
 
 // Serve static files from the React app (optional)
-app.use(express.static(path.join(__dirname, '../client/build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+app.use(express.static(path.join(__dirname, "../client/build")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/build", "index.html"));
 });
 
 // Rate limiting function
@@ -138,7 +143,7 @@ function checkRateLimit(key, limit, window, trackingObject) {
 }
 
 // Logging function for room messages
-function logMessage(room, sender, content, isFile = false, fileUrl = '') {
+function logMessage(room, sender, content, isFile = false, fileUrl = "") {
   const timestamp = new Date().toISOString();
   const logFile = path.join(logsDir, `${room}.log`);
   let logEntry;
@@ -157,27 +162,31 @@ function logMessage(room, sender, content, isFile = false, fileUrl = '') {
 const clients = new Map();
 
 // WebSocket connection handling
-wss.on('error', (error) => {
-  console.error('WebSocket server error:', error);
+wss.on("error", (error) => {
+  console.error("WebSocket server error:", error);
 });
 
-wss.on('connection', (socket) => {
-  console.log('Client connected from:', socket._socket.remoteAddress);
+wss.on("connection", (socket) => {
+  console.log("Client connected from:", socket._socket.remoteAddress);
   socket.authenticated = false;
-  socket.room = 'general';
+  socket.room = "general";
 
-  socket.on('error', (error) => {
-    console.error('WebSocket client error:', error);
+  socket.on("error", (error) => {
+    console.error("WebSocket client error:", error);
   });
 
-  socket.on('message', (message) => {
-    console.log('Received message from:', socket._socket.remoteAddress, message.toString());
+  socket.on("message", (message) => {
+    console.log(
+      "Received message from:",
+      socket._socket.remoteAddress,
+      message.toString()
+    );
     let data;
     try {
       data = JSON.parse(message.toString());
     } catch (e) {
       socket.send(
-        JSON.stringify({ type: 'error', message: 'Invalid message format' })
+        JSON.stringify({ type: "error", message: "Invalid message format" })
       );
       return;
     }
@@ -185,110 +194,110 @@ wss.on('connection', (socket) => {
     const { type } = data;
     const ip = socket._socket.remoteAddress;
 
-    if (type === 'register' || type === 'login') {
+    if (type === "register" || type === "login") {
       if (!checkRateLimit(ip, LOGIN_LIMIT, LOGIN_WINDOW, loginAttempts)) {
         socket.send(
           JSON.stringify({
-            type: 'error',
-            message: 'Too many attempts, please try again later',
+            type: "error",
+            message: "Too many attempts, please try again later",
           })
         );
         return;
       }
     }
 
-    if (type === 'register') {
+    if (type === "register") {
       const { username, password } = data;
       try {
         const hash = bcrypt.hashSync(password, 10);
-        db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(
+        db.prepare("INSERT INTO users (username, password) VALUES (?, ?)").run(
           username,
           hash
         );
         socket.send(
-          JSON.stringify({ type: 'status', message: 'Registered successfully' })
+          JSON.stringify({ type: "status", message: "Registered successfully" })
         );
       } catch (e) {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Username taken' })
+          JSON.stringify({ type: "error", message: "Username taken" })
         );
       }
-    } else if (type === 'login') {
+    } else if (type === "login") {
       const { username, password } = data;
       const user = db
-        .prepare('SELECT password FROM users WHERE username = ?')
+        .prepare("SELECT password FROM users WHERE username = ?")
         .get(username);
       if (user && bcrypt.compareSync(password, user.password)) {
         socket.authenticated = true;
         socket.username = username;
         clients.set(username, socket);
         socket.send(
-          JSON.stringify({ type: 'status', message: 'Logged in successfully' })
+          JSON.stringify({ type: "status", message: "Logged in successfully" })
         );
-        sendRoomHistory(socket, 'general');
+        sendRoomHistory(socket, "general");
       } else {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Invalid credentials' })
+          JSON.stringify({ type: "error", message: "Invalid credentials" })
         );
       }
-    } else if (type === 'create_room') {
+    } else if (type === "create_room") {
       if (!socket.authenticated) {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Please log in first' })
+          JSON.stringify({ type: "error", message: "Please log in first" })
         );
         return;
       }
       const { roomName, isPublic, password, roomKeyJwk } = data;
       if (!roomName) {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Room name is required' })
+          JSON.stringify({ type: "error", message: "Room name is required" })
         );
         return;
       }
       try {
         const hash = isPublic ? null : bcrypt.hashSync(password, 10);
         db.prepare(
-          'INSERT INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)'
+          "INSERT INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)"
         ).run(roomName, isPublic ? 1 : 0, hash, JSON.stringify(roomKeyJwk));
         socket.send(
           JSON.stringify({
-            type: 'status',
+            type: "status",
             message: `Room "${roomName}" created successfully`,
           })
         );
         broadcastToAll({
-          type: 'new_room',
+          type: "new_room",
           room: { name: roomName, isPublic },
           roomKeyJwk,
         });
       } catch (e) {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Room name already exists' })
+          JSON.stringify({ type: "error", message: "Room name already exists" })
         );
       }
-    } else if (type === 'get_rooms') {
+    } else if (type === "get_rooms") {
       if (socket.authenticated) {
-        const roomList = db.prepare('SELECT name, isPublic FROM rooms').all();
-        socket.send(JSON.stringify({ type: 'room_list', rooms: roomList }));
+        const roomList = db.prepare("SELECT name, isPublic FROM rooms").all();
+        socket.send(JSON.stringify({ type: "room_list", rooms: roomList }));
       } else {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Please log in first' })
+          JSON.stringify({ type: "error", message: "Please log in first" })
         );
       }
-    } else if (type === 'join') {
+    } else if (type === "join") {
       if (!socket.authenticated) {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Please log in first' })
+          JSON.stringify({ type: "error", message: "Please log in first" })
         );
         return;
       }
       const { room, password } = data;
       const roomData = db
-        .prepare('SELECT isPublic, password, key FROM rooms WHERE name = ?')
+        .prepare("SELECT isPublic, password, key FROM rooms WHERE name = ?")
         .get(room);
       if (!roomData) {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Room does not exist' })
+          JSON.stringify({ type: "error", message: "Room does not exist" })
         );
         return;
       }
@@ -299,7 +308,7 @@ wss.on('connection', (socket) => {
         socket.room = room;
         socket.send(
           JSON.stringify({
-            type: 'status',
+            type: "status",
             message: `Joined room: ${room}`,
             roomKeyJwk: roomData.key ? JSON.parse(roomData.key) : null,
           })
@@ -307,10 +316,10 @@ wss.on('connection', (socket) => {
         sendRoomHistory(socket, room);
       } else {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Incorrect password' })
+          JSON.stringify({ type: "error", message: "Incorrect password" })
         );
       }
-    } else if (type === 'text') {
+    } else if (type === "text") {
       if (socket.authenticated) {
         const { content } = data;
         if (
@@ -323,15 +332,15 @@ wss.on('connection', (socket) => {
         ) {
           socket.send(
             JSON.stringify({
-              type: 'error',
-              message: 'Message rate limit exceeded, please wait',
+              type: "error",
+              message: "Message rate limit exceeded, please wait",
             })
           );
           return;
         }
-        const broadcastMsg = { type: 'text', sender: socket.username, content };
+        const broadcastMsg = { type: "text", sender: socket.username, content };
         db.prepare(
-          'INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)'
+          "INSERT INTO messages (room, sender, content, timestamp) VALUES (?, ?, ?, ?)"
         ).run(
           socket.room,
           socket.username,
@@ -342,10 +351,10 @@ wss.on('connection', (socket) => {
         broadcast(socket.room, broadcastMsg);
       } else {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Please log in first' })
+          JSON.stringify({ type: "error", message: "Please log in first" })
         );
       }
-    } else if (type === 'file_start') {
+    } else if (type === "file_start") {
       if (socket.authenticated) {
         const { uploadId, fileName, fileSize, totalChunks } = data;
         uploads[uploadId] = {
@@ -356,14 +365,14 @@ wss.on('connection', (socket) => {
           chunks: new Array(totalChunks).fill(null),
         };
         socket.send(
-          JSON.stringify({ type: 'status', message: 'File upload started' })
+          JSON.stringify({ type: "status", message: "File upload started" })
         );
       } else {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Please log in first' })
+          JSON.stringify({ type: "error", message: "Please log in first" })
         );
       }
-    } else if (type === 'file_chunk') {
+    } else if (type === "file_chunk") {
       if (socket.authenticated) {
         const { uploadId, chunkIndex, data: chunkData } = data;
         const upload = uploads[uploadId];
@@ -373,13 +382,24 @@ wss.on('connection', (socket) => {
           upload.receivedChunks++;
           if (upload.receivedChunks === upload.totalChunks) {
             const fileBuffer = Buffer.concat(upload.chunks);
+
+            // AES 256 encryption
+            const aesKey = crypto.randomBytes(32); // 256 bits key
+            const iv = crypto.randomBytes(12); //
+            const cipher = cyrpto.createCipheriv("aes-256-gcm", aesKey, iv);
+            const encrypted = Buffer.concat([
+              cipher.update(fileBuffer),
+              cipher.final(),
+            ]);
+            const authTag = cipher.getAuthTag();
+
             const uniqueFileName = `${uploadId}_${upload.fileName}`;
             const filePath = path.join(uploadsDir, uniqueFileName);
             fs.writeFileSync(filePath, fileBuffer);
             const fileUrl = `/Uploads/${uniqueFileName}`;
 
             db.prepare(
-              'INSERT INTO files (room, sender, fileUrl, fileName, timestamp) VALUES (?, ?, ?, ?, ?)'
+              "INSERT INTO files (room, sender, fileUrl, fileName, timestamp) VALUES (?, ?, ?, ?, ?)"
             ).run(
               socket.room,
               socket.username,
@@ -389,7 +409,7 @@ wss.on('connection', (socket) => {
             );
 
             const broadcastMsg = {
-              type: 'file',
+              type: "file",
               sender: socket.username,
               fileUrl,
               fileName: upload.fileName,
@@ -405,24 +425,24 @@ wss.on('connection', (socket) => {
             delete uploads[uploadId];
           } else {
             socket.send(
-              JSON.stringify({ type: 'status', message: 'Chunk received' })
+              JSON.stringify({ type: "status", message: "Chunk received" })
             );
           }
         } else {
           socket.send(
-            JSON.stringify({ type: 'error', message: 'Invalid upload ID' })
+            JSON.stringify({ type: "error", message: "Invalid upload ID" })
           );
         }
       } else {
         socket.send(
-          JSON.stringify({ type: 'error', message: 'Please log in first' })
+          JSON.stringify({ type: "error", message: "Please log in first" })
         );
       }
     }
   });
 
-  socket.on('close', () => {
-    console.log('Client disconnected from:', socket._socket.remoteAddress);
+  socket.on("close", () => {
+    console.log("Client disconnected from:", socket._socket.remoteAddress);
     for (let [username, client] of clients) {
       if (client === socket) clients.delete(username);
     }
@@ -469,18 +489,18 @@ function sendRoomHistory(socket, room) {
   );
 
   history.forEach((item) => {
-    if (item.type === 'text') {
+    if (item.type === "text") {
       socket.send(
         JSON.stringify({
-          type: 'text',
+          type: "text",
           sender: item.sender,
           content: item.content,
         })
       );
-    } else if (item.type === 'file') {
+    } else if (item.type === "file") {
       socket.send(
         JSON.stringify({
-          type: 'file',
+          type: "file",
           sender: item.sender,
           fileUrl: item.fileUrl,
           fileName: item.fileName,
@@ -509,7 +529,9 @@ function broadcastToAll(message) {
 }
 
 // Start the server
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} (public: https://${publicDomain})`);
-  console.log('WebSocket server initialized at wss://' + publicDomain);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `Server running on port ${PORT} (public: https://${publicDomain})`
+  );
+  console.log("WebSocket server initialized at wss://" + publicDomain);
 });
