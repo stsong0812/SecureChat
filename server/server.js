@@ -96,7 +96,11 @@ const messageCounts = {};
 const uploads = {};
 
 // Create uploads and logs directories
-const uploadsDir = path.join(__dirname, "Uploads");
+const uploadsDir =
+  process.env.NODE_ENV === "production"
+    ? path.join("/tmp", "Uploads")
+    : path.join(__dirname, "Uploads");
+
 const logsDir = path.join(__dirname, "logs");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
