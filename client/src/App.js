@@ -54,11 +54,28 @@ const decryptMessage = async (encrypted, key) => {
   if (typeof encrypted === "string") return encrypted; // Handle plain text
   try {
     const decoder = new TextDecoder();
-    const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: new Uint8Array(encrypted.iv) },
-      key,
-      new Uint8Array(encrypted.data)
+    const iv = new Uint8Array(
+      messages
+        .find((m) => m.fileUrl === fileUrl)
+        ?.iv?.match(/.{1,2}/g)
+        .map((byte) => parseInt(byte, 16)) || []
     );
+    const tag = new Uint8Array(
+      messages
+        .find((m) => m.fileUrl === fileUrl)
+        ?.authTag?.match(/.{1,2}/g)
+        .map((byte) => parseInt(byte, 16)) || []
+    );
+
+    // Merge ciphertext + authTag as required by SubtleCrypto
+    const fullData = new Uint8Array([...new Uint8Array(encryptedData), ...tag]);
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      roomKeysRef.current[currentRoom],
+      fullData
+    );
+
     return decoder.decode(decrypted);
   } catch (error) {
     console.error("Decryption failed:", error, "Encrypted content:", encrypted);

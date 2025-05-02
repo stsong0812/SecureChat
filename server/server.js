@@ -517,6 +517,8 @@ function sendRoomHistory(socket, room) {
       fileUrl: f.fileUrl,
       fileName: f.fileName,
       timestamp: f.timestamp,
+      iv: f.iv,
+      authTag: f.authTag,
     }));
 
   const history = [...textMessages, ...fileMessages].sort(
