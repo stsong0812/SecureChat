@@ -439,7 +439,10 @@ wss.on("connection", (socket) => {
                 sender: socket.username,
                 fileUrl,
                 fileName: upload.fileName,
+                iv: iv.toString("hex"),
+                authTag: authTag.toString("hex"),
               };
+
               logMessage(
                 socket.room,
                 socket.username,
