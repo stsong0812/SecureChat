@@ -493,44 +493,51 @@ function App() {
       console.log("Decrypting file:", fileUrl);
       console.log("IV HEX:", ivHex);
       console.log("AuthTag HEX:", authTagHex);
-      console.log("Decryption key:", roomKeysRef.current[currentRoom]); // more debugging
 
       const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.statusText}`);
+      }
       const encryptedBuffer = await response.arrayBuffer();
 
-      if (currentRoom === "general") {
-        const key = roomKeysRef.current[currentRoom];
-        const iv = Uint8Array.from(Buffer.from(ivHex, "hex"));
-        const authTag = Uint8Array.from(Buffer.from(authTagHex, "hex"));
+      const key = roomKeysRef.current[currentRoom];
+      console.log("Decryption key:", key);
 
-        const fullData = new Uint8Array(
-          encryptedBuffer.byteLength + authTag.byteLength
-        );
-        fullData.set(new Uint8Array(encryptedBuffer), 0);
-        fullData.set(authTag, encryptedBuffer.byteLength);
+      const iv = Uint8Array.from(Buffer.from(ivHex, "hex"));
+      const authTag = Uint8Array.from(Buffer.from(authTagHex, "hex"));
 
+      if (iv.length !== 12) {
+        throw new Error("Invalid IV length. Expected 12 bytes.");
+      }
+      if (authTag.length !== 16) {
+        throw new Error("Invalid AuthTag length. Expected 16 bytes.");
+      }
+
+      const fullData = new Uint8Array(
+        encryptedBuffer.byteLength + authTag.byteLength
+      );
+      fullData.set(new Uint8Array(encryptedBuffer), 0);
+      fullData.set(authTag, encryptedBuffer.byteLength);
+
+      try {
         const decrypted = await crypto.subtle.decrypt(
           { name: "AES-GCM", iv },
           key,
           fullData
         );
-
-        const blob = new Blob([decrypted]);
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.click();
-        window.URL.revokeObjectURL(url);
-      } else {
-        const blob = new Blob([encryptedBuffer]);
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.click();
-        window.URL.revokeObjectURL(url);
+        return decrypted;
+      } catch (error) {
+        console.error("Decryption failed:", error);
+        throw error;
       }
+
+      const blob = new Blob([decrypted]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("File decryption failed:", error);
       showPopupMessage("Failed to decrypt file", "error");
