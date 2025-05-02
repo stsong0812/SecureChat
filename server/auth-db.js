@@ -1,9 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const Database = require('better-sqlite3');
-require('dotenv').config();
+const fs = require("fs");
+const path = require("path");
+const Database = require("better-sqlite3");
+require("dotenv").config();
 
-const dbPath = process.env.DB_PATH || '/app/db/securechat.db';
+const dbPath = process.env.DB_PATH || "/app/db/securechat.db";
 const dbKey = process.env.SECRET_KEY;
 
 if (!dbPath || !dbKey) {
@@ -53,6 +53,9 @@ try {
         fileUrl TEXT,
         fileName TEXT,
         timestamp INTEGER
+        aesKey TEXT,
+        iv TEXT
+        authKey TEXT
       );
       CREATE TABLE IF NOT EXISTS rooms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,8 +66,9 @@ try {
       );
     `);
 
-    db.prepare("INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)")
-      .run("general", 1, null, null);
+    db.prepare(
+      "INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)"
+    ).run("general", 1, null, null);
 
     console.log('Database initialized with "general" room');
     db.close();
