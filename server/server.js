@@ -442,7 +442,7 @@ wss.on("connection", (socket) => {
                 iv: iv.toString("hex"),
                 authTag: authTag.toString("hex"),
               };
-
+              console.log("Sending file metadata to client:", broadcastMsg); // more debugging
               logMessage(
                 socket.room,
                 socket.username,

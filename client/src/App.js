@@ -131,7 +131,7 @@ function App() {
     const initializeKeysAndWebSocket = async () => {
       const generalKey = await deriveRoomKey("general");
       roomKeysRef.current = { general: generalKey };
-      console.log("Initial room key set for 'general':", generalKey);
+      console.log("Derived general room key:", generalKey);
 
       const wsUrl = process.env.REACT_APP_WS_URL || "wss://localhost:7777";
       console.log("Connecting to WebSocket URL:", wsUrl); // Debug log
@@ -209,7 +209,8 @@ function App() {
               await processTextMessage(sender, content, currentRoom);
             }
           } else if (type === "file") {
-            console.log("Received file:", data); // using for debug
+            console.log("Received file WebSocket message:", data);
+            console.log("IV:", data.iv, "AuthTag:", data.authTag); // more debbing
             setMessages((prev) => [
               ...prev,
               {
@@ -489,6 +490,11 @@ function App() {
     authTagHex
   ) => {
     try {
+      console.log("Decrypting file:", fileUrl);
+      console.log("IV HEX:", ivHex);
+      console.log("AuthTag HEX:", authTagHex);
+      console.log("Decryption key:", roomKeysRef.current[currentRoom]); // more debugging
+
       const response = await fetch(fileUrl);
       const encryptedBuffer = await response.arrayBuffer();
 
