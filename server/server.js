@@ -567,3 +567,10 @@ server.listen(PORT, "0.0.0.0", () => {
   );
   console.log("WebSocket server initialized at wss://" + publicDomain);
 });
+// DEBUG: Show encrypted files in the database
+const encryptedFiles = db
+  .prepare(
+    "SELECT id, fileName, aesKey, iv, authTag FROM files WHERE aesKey IS NOT NULL LIMIT 5"
+  )
+  .all();
+console.log("Encrypted files found in DB:", encryptedFiles);
