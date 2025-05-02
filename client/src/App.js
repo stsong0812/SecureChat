@@ -216,8 +216,8 @@ function App() {
                 sender,
                 fileUrl,
                 fileName,
-                iv: data.iv,
-                authTag: data.authTag,
+                iv,
+                authTag,
               },
             ]);
           } else if (type === "room_list") {
@@ -481,44 +481,51 @@ function App() {
     }
   };
 
-  const decryptAndDownloadFile = async (fileUrl, fileName) => {
+  const decryptAndDownloadFile = async (
+    fileUrl,
+    fileName,
+    ivHex,
+    authTagHex
+  ) => {
     try {
       const response = await fetch(fileUrl);
-      const encryptedData = await response.arrayBuffer();
-      let blob;
-      if (currentRoom === "general") {
-        const fileMeta = messages.find(
-          (m) => m.fileUrl === fileUrl && m.fileName === fileName
-        );
+      const encryptedBuffer = await response.arrayBuffer();
 
-        if (!fileMeta || !fileMeta.iv || !fileMeta.authTag) {
-          throw new Error("Missing encryption metadata");
-        }
+      if (currentRoom === "general") {
+        const key = roomKeysRef.current[currentRoom];
+        const iv = Uint8Array.from(Buffer.from(ivHex, "hex"));
+        const authTag = Uint8Array.from(Buffer.from(authTagHex, "hex"));
+
+        // AES-GCM requires authTag to be appended to the ciphertext
+        const fullData = new Uint8Array(
+          encryptedBuffer.byteLength + authTag.byteLength
+        );
+        fullData.set(new Uint8Array(encryptedBuffer), 0);
+        fullData.set(authTag, encryptedBuffer.byteLength);
 
         const decrypted = await crypto.subtle.decrypt(
-          {
-            name: "AES-GCM",
-            iv: Uint8Array.from(Buffer.from(fileMeta.iv, "hex")),
-            additionalData: undefined,
-            tagLength: 128,
-          },
-          roomKeysRef.current[currentRoom],
-          Buffer.concat([
-            new Uint8Array(encryptedData),
-            Uint8Array.from(Buffer.from(fileMeta.authTag, "hex")),
-          ])
+          { name: "AES-GCM", iv },
+          key,
+          fullData
         );
 
-        blob = new Blob([decrypted]);
+        const blob = new Blob([decrypted]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        window.URL.revokeObjectURL(url);
       } else {
-        blob = new Blob([encryptedData]);
+        // Not encrypted
+        const blob = new Blob([encryptedBuffer]);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        window.URL.revokeObjectURL(url);
       }
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("File decryption failed:", error);
       showPopupMessage("Failed to decrypt file", "error");
@@ -621,7 +628,12 @@ function App() {
                       <button
                         className="file-link"
                         onClick={() =>
-                          decryptAndDownloadFile(msg.fileUrl, msg.fileName)
+                          decryptAndDownloadFile(
+                            msg.fileUrl,
+                            msg.fileName,
+                            msg.iv,
+                            msg.authTag
+                          )
                         }
                       >
                         {msg.fileName}{" "}
