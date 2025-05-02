@@ -209,6 +209,7 @@ function App() {
               await processTextMessage(sender, content, currentRoom);
             }
           } else if (type === "file") {
+            console.log("Received file:", data); // using for debug
             setMessages((prev) => [
               ...prev,
               {
@@ -216,8 +217,8 @@ function App() {
                 sender,
                 fileUrl,
                 fileName,
-                iv,
-                authTag,
+                iv: data.iv,
+                authTag: data.authTag,
               },
             ]);
           } else if (type === "room_list") {
@@ -496,7 +497,6 @@ function App() {
         const iv = Uint8Array.from(Buffer.from(ivHex, "hex"));
         const authTag = Uint8Array.from(Buffer.from(authTagHex, "hex"));
 
-        // AES-GCM requires authTag to be appended to the ciphertext
         const fullData = new Uint8Array(
           encryptedBuffer.byteLength + authTag.byteLength
         );
@@ -517,7 +517,6 @@ function App() {
         link.click();
         window.URL.revokeObjectURL(url);
       } else {
-        // Not encrypted
         const blob = new Blob([encryptedBuffer]);
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
