@@ -427,10 +427,12 @@ function App() {
       showPopupMessage("WebSocket not connected", "error");
       return;
     }
+
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const key = roomKeysRef.current[currentRoom];
+    const key =
+      currentRoom === "general" ? roomKeysRef.current[currentRoom] : null;
 
     if (!key) {
       showPopupMessage("Missing encryption key for this room", "error");
@@ -439,6 +441,35 @@ function App() {
 
     // Ensure file buffer is ready
     const fileBuffer = await file.arrayBuffer();
+    if (!key) {
+      // Non-encrypted file upload (non-general room)
+      const chunks = [new Uint8Array(fileBuffer)];
+      const totalChunks = 1;
+
+      ws.send(
+        JSON.stringify({
+          type: "file_start",
+          uploadId,
+          fileName: file.name,
+          fileSize: file.size,
+          totalChunks,
+          iv: "", // empty for plaintext
+          authTag: "",
+        })
+      );
+
+      ws.send(
+        JSON.stringify({
+          type: "file_chunk",
+          uploadId,
+          chunkIndex: 0,
+          data: Array.from(chunks[0]),
+        })
+      );
+
+      return; // skip encryption logic
+    }
+
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
