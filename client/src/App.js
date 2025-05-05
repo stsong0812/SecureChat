@@ -212,8 +212,26 @@ function App() {
     };
 
     initializeKeysAndWebSocket();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // add missing decryptMessage function
   }, []);
+  const decryptMessage = async (encrypted, key) => {
+    try {
+      const decoder = new TextDecoder();
+      const iv = new Uint8Array(encrypted.iv);
+      const data = new Uint8Array(encrypted.data);
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        data
+      );
+
+      return decoder.decode(decrypted);
+    } catch (error) {
+      console.error("Message decryption failed:", error);
+      return "[Decryption Error]";
+    }
+  };
 
   const processTextMessage = async (sender, content, room) => {
     console.log("Processing text message:", { sender, content });
