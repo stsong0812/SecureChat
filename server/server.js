@@ -401,6 +401,15 @@ wss.on("connection", (socket) => {
         // Extract iv and authTag from the message
         const { uploadId, fileName, fileSize, totalChunks, iv, authTag } = data;
 
+        console.log("🟡 Received file_start:", {
+          uploadId,
+          fileName,
+          fileSize,
+          totalChunks,
+          iv,
+          authTag,
+        });
+
         // Safety check to avoid undefined errors
         if (!iv || !authTag) {
           socket.send(
@@ -422,6 +431,7 @@ wss.on("connection", (socket) => {
           iv: Buffer.from(iv),
           authTag: Buffer.from(authTag),
         };
+        console.log("🟢 Current uploads after file_start:", uploads);
 
         socket.send(
           JSON.stringify({ type: "status", message: "File upload started" })
@@ -574,6 +584,8 @@ function sendRoomHistory(socket, room) {
           sender: item.sender,
           fileUrl: item.fileUrl,
           fileName: item.fileName,
+          iv: item.iv,
+          authTag: item.authTag,
         })
       );
     }

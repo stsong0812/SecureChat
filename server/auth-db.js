@@ -52,10 +52,10 @@ try {
         sender TEXT,
         fileUrl TEXT,
         fileName TEXT,
-        timestamp INTEGER
+        timestamp INTEGER,
         aesKey TEXT,
         iv TEXT,
-        authKey TEXT
+        authTag TEXT
       );
       CREATE TABLE IF NOT EXISTS rooms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

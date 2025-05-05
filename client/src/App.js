@@ -423,6 +423,10 @@ function App() {
   };
 
   const uploadFile = async (file) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      showPopupMessage("WebSocket not connected", "error");
+      return;
+    }
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -457,6 +461,14 @@ function App() {
       const end = Math.min(start + chunkSize, ciphertext.length);
       chunks.push(new Uint8Array(ciphertext.slice(start, end)));
     }
+    console.log("🟡 Sending file_start:", {
+      uploadId,
+      fileName: file.name,
+      fileSize: file.size,
+      totalChunks,
+      iv: Array.from(iv),
+      authTag: Array.from(authTag),
+    });
 
     // Send file_start with IV and AuthTag
     ws.send(
@@ -473,6 +485,9 @@ function App() {
 
     // Send encrypted chunks
     chunks.forEach((chunk, index) => {
+      console.log(
+        `🟢 Sending chunk ${index + 1}/${totalChunks} for ${uploadId}`
+      );
       ws.send(
         JSON.stringify({
           type: "file_chunk",
