@@ -461,10 +461,12 @@ function App() {
     const authTag = encryptedBytes.slice(-16); // last 16 bytes
     const ciphertext = encryptedBytes.slice(0, -16); // everything else
 
+    // Append authTag to the ciphertext
     const fullEncrypted = new Uint8Array(ciphertext.length + authTag.length);
     fullEncrypted.set(ciphertext, 0);
     fullEncrypted.set(authTag, ciphertext.length);
 
+    // Then chunk fullEncrypted
     const chunks = [];
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
