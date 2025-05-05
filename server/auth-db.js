@@ -3,7 +3,7 @@ const path = require("path");
 const Database = require("better-sqlite3");
 require("dotenv").config();
 
-const dbPath = process.env.DB_PATH || "/app/db/securechat.db";
+const dbPath = process.env.DB_PATH || "./db/securechat.db";
 const dbKey = process.env.SECRET_KEY;
 
 if (!dbPath || !dbKey) {
