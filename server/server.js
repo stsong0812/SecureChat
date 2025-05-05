@@ -90,7 +90,28 @@ if (!fs.existsSync(dbPath)) {
       key TEXT
     );
   `);
+  function columnExists(db, table, column) {
+    const result = db.prepare(`PRAGMA table_info(${table})`).all();
+    return result.some((col) => col.name === column);
+  }
 
+  console.log("Checking for missing encryption columns in 'files' table...");
+  const alterStatements = [];
+  if (!columnExists(db, "files", "iv"))
+    alterStatements.push(`ALTER TABLE files ADD COLUMN iv TEXT`);
+  if (!columnExists(db, "files", "authTag"))
+    alterStatements.push(`ALTER TABLE files ADD COLUMN authTag TEXT`);
+  if (!columnExists(db, "files", "aesKey"))
+    alterStatements.push(`ALTER TABLE files ADD COLUMN aesKey TEXT`);
+
+  for (const stmt of alterStatements) {
+    try {
+      db.exec(stmt);
+      console.log(`Executed: ${stmt}`);
+    } catch (err) {
+      console.error(`Failed to execute "${stmt}": ${err.message}`);
+    }
+  }
   db.prepare(
     "INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)"
   ).run("general", 1, null, null);
