@@ -455,7 +455,7 @@ function App() {
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, ciphertext.length);
-      chunks.push(ciphertext.slice(start, end));
+      chunks.push(new Uint8Array(ciphertext.slice(start, end)));
     }
 
     // Send file_start with IV and AuthTag
@@ -478,7 +478,7 @@ function App() {
           type: "file_chunk",
           uploadId,
           chunkIndex: index,
-          data: Array.from(chunk), // ← Send raw Uint8Array, not base64 or JSON
+          data: Array.from(chunk), // Send raw Uint8Array
         })
       );
     });
@@ -510,7 +510,7 @@ function App() {
       const key = roomKeysRef.current[currentRoom];
       console.log("Decryption key:", key);
 
-      // Replace Buffer.from with hexToUint8Array
+      // Replaced Buffer.from with hexToUint8Array
       const hexToUint8Array = (hex) => {
         const bytes = new Uint8Array(hex.length / 2);
         for (let i = 0; i < hex.length; i += 2) {
