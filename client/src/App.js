@@ -470,7 +470,14 @@ function App() {
       authTag: Array.from(authTag),
     });
 
-    // Send file_start with IV and AuthTag
+    // Convert IV and AuthTag to hex before sending
+    const ivHex = Array.from(iv)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const authTagHex = Array.from(authTag)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
     ws.send(
       JSON.stringify({
         type: "file_start",
@@ -478,8 +485,8 @@ function App() {
         fileName: file.name,
         fileSize: file.size,
         totalChunks,
-        iv: Array.from(iv),
-        authTag: Array.from(authTag),
+        iv: ivHex,
+        authTag: authTagHex,
       })
     );
 
