@@ -461,11 +461,15 @@ function App() {
     const authTag = encryptedBytes.slice(-16); // last 16 bytes
     const ciphertext = encryptedBytes.slice(0, -16); // everything else
 
+    const fullEncrypted = new Uint8Array(ciphertext.length + authTag.length);
+    fullEncrypted.set(ciphertext, 0);
+    fullEncrypted.set(authTag, ciphertext.length);
+
     const chunks = [];
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, ciphertext.length);
-      chunks.push(new Uint8Array(ciphertext.slice(start, end)));
+      const end = Math.min(start + chunkSize, fullEncrypted.length);
+      chunks.push(new Uint8Array(fullEncrypted.slice(start, end)));
     }
 
     const ivHex = Array.from(iv)
