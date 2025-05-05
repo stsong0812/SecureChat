@@ -439,7 +439,6 @@ wss.on("connection", (socket) => {
 
           if (upload) {
             upload.chunks[chunkIndex] = Buffer.from(chunkData);
-            upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
             upload.receivedChunks++;
 
             if (upload.receivedChunks === upload.totalChunks) {
