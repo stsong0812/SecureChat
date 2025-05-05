@@ -7,6 +7,31 @@ const bcrypt = require("bcrypt");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const util = require("util");
+const pbkdf2 = util.promisify(crypto.pbkdf2);
+
+// Derive a consistent AES key for the 'general' room
+async function deriveGeneralRoomKey() {
+  const roomName = "general";
+  const password = roomName + "secret";
+  const salt = "salt";
+  const iterations = 100000;
+  const keyLength = 32; // 256-bit AES key
+
+  try {
+    const derivedKey = await pbkdf2(
+      password,
+      salt,
+      iterations,
+      keyLength,
+      "sha256"
+    );
+    return derivedKey;
+  } catch (err) {
+    console.error("Key derivation failed:", err);
+    throw err;
+  }
+}
 
 // Configuration from .env
 const PORT = process.env.PORT || 7777;
@@ -192,7 +217,7 @@ wss.on("connection", (socket) => {
     console.error("WebSocket client error:", error);
   });
 
-  socket.on("message", (message) => {
+  socket.on("message", async (message) => {
     console.log(
       "Received message from:",
       socket._socket.remoteAddress,
@@ -380,6 +405,8 @@ wss.on("connection", (socket) => {
           totalChunks,
           receivedChunks: 0,
           chunks: new Array(totalChunks).fill(null),
+          iv: Array.from(iv),
+          authTag: Array.from(authTag),
         };
         socket.send(
           JSON.stringify({ type: "status", message: "File upload started" })
@@ -402,34 +429,26 @@ wss.on("connection", (socket) => {
 
             if (upload.receivedChunks === upload.totalChunks) {
               const fileBuffer = Buffer.concat(upload.chunks);
-
-              const aesKey = crypto.randomBytes(32);
-              const iv = crypto.randomBytes(12);
-              const cipher = crypto.createCipheriv("aes-256-gcm", aesKey, iv);
-              const encrypted = Buffer.concat([
-                cipher.update(fileBuffer),
-                cipher.final(),
-              ]);
-              const authTag = cipher.getAuthTag();
+              const iv = Buffer.from(upload.iv);
+              const authTag = Buffer.from(upload.authTag);
 
               const uniqueFileName = `${uploadId}_${upload.fileName}.enc`;
               const filePath = path.join(uploadsDir, uniqueFileName);
-              fs.writeFileSync(filePath, encrypted);
+              fs.writeFileSync(filePath, fileBuffer); // Save raw ciphertext as-is
+
               const fileUrl = `/Uploads/${uniqueFileName}`;
 
               db.prepare(
-                `
-                INSERT INTO files 
-                (room, sender, fileUrl, fileName, timestamp, aesKey, iv, authTag)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-              `
+                `INSERT INTO files 
+  (room, sender, fileUrl, fileName, timestamp, aesKey, iv, authTag)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
               ).run(
                 socket.room,
                 socket.username,
                 fileUrl,
                 upload.fileName,
                 Date.now(),
-                aesKey.toString("hex"),
+                "", // Skip key storage — optional for general room
                 iv.toString("hex"),
                 authTag.toString("hex")
               );
@@ -442,7 +461,7 @@ wss.on("connection", (socket) => {
                 iv: iv.toString("hex"),
                 authTag: authTag.toString("hex"),
               };
-              console.log("Sending file metadata to client:", broadcastMsg); // more debugging
+              console.log("Sending file metadata to client:", broadcastMsg);
               logMessage(
                 socket.room,
                 socket.username,

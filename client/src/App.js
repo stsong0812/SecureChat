@@ -428,6 +428,32 @@ function App() {
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const key = roomKeysRef.current[currentRoom];
 
+    if (!key) {
+      showPopupMessage("Missing encryption key for this room", "error");
+      return;
+    }
+
+    // Encrypt entire file to get IV + authTag
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const fullEncrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      await file.arrayBuffer()
+    );
+
+    const encryptedBytes = new Uint8Array(fullEncrypted);
+    const authTag = encryptedBytes.slice(-16); // last 16 bytes
+    const ciphertext = encryptedBytes.slice(0, -16); // everything else
+
+    // Split ciphertext into chunks
+    const chunks = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, ciphertext.length);
+      chunks.push(ciphertext.slice(start, end));
+    }
+
+    // Send file_start with IV and authTag
     ws.send(
       JSON.stringify({
         type: "file_start",
@@ -435,45 +461,22 @@ function App() {
         fileName: file.name,
         fileSize: file.size,
         totalChunks,
+        iv: Array.from(iv),
+        authTag: Array.from(authTag),
       })
     );
 
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, file.size);
-      const chunk = file.slice(start, end);
-      const reader = new FileReader();
-
-      reader.onload = async () => {
-        const data = reader.result;
-        if (currentRoom === "general") {
-          const encryptedChunk = await encryptFileChunk(
-            new Uint8Array(data),
-            key
-          );
-          const base64 = btoa(JSON.stringify(encryptedChunk));
-          ws.send(
-            JSON.stringify({
-              type: "file_chunk",
-              uploadId,
-              chunkIndex: i,
-              data: base64,
-            })
-          );
-        } else {
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(data)));
-          ws.send(
-            JSON.stringify({
-              type: "file_chunk",
-              uploadId,
-              chunkIndex: i,
-              data: base64,
-            })
-          );
-        }
-      };
-      reader.readAsArrayBuffer(chunk);
-    }
+    // Send encrypted chunks
+    chunks.forEach((chunk, index) => {
+      ws.send(
+        JSON.stringify({
+          type: "file_chunk",
+          uploadId,
+          chunkIndex: index,
+          data: btoa(String.fromCharCode(...chunk)),
+        })
+      );
+    });
   };
 
   const handleFileSelect = (event) => {
@@ -495,41 +498,41 @@ function App() {
       console.log("AuthTag HEX:", authTagHex);
 
       const response = await fetch(fileUrl);
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`Failed to fetch file: ${response.statusText}`);
-      }
       const encryptedBuffer = await response.arrayBuffer();
 
       const key = roomKeysRef.current[currentRoom];
       console.log("Decryption key:", key);
 
-      const iv = Uint8Array.from(Buffer.from(ivHex, "hex"));
-      const authTag = Uint8Array.from(Buffer.from(authTagHex, "hex"));
+      // Replace Buffer.from with hexToUint8Array
+      const hexToUint8Array = (hex) => {
+        const bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < hex.length; i += 2) {
+          bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+        }
+        return bytes;
+      };
 
-      if (iv.length !== 12) {
+      const iv = hexToUint8Array(ivHex);
+      const authTag = hexToUint8Array(authTagHex);
+
+      if (iv.length !== 12)
         throw new Error("Invalid IV length. Expected 12 bytes.");
-      }
-      if (authTag.length !== 16) {
+      if (authTag.length !== 16)
         throw new Error("Invalid AuthTag length. Expected 16 bytes.");
-      }
 
       const fullData = new Uint8Array(
-        encryptedBuffer.byteLength + authTag.byteLength
+        encryptedBuffer.byteLength + authTag.length
       );
       fullData.set(new Uint8Array(encryptedBuffer), 0);
       fullData.set(authTag, encryptedBuffer.byteLength);
 
-      try {
-        const decrypted = await crypto.subtle.decrypt(
-          { name: "AES-GCM", iv },
-          key,
-          fullData
-        );
-        return decrypted;
-      } catch (error) {
-        console.error("Decryption failed:", error);
-        throw error;
-      }
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        fullData
+      );
 
       const blob = new Blob([decrypted]);
       const url = window.URL.createObjectURL(blob);
