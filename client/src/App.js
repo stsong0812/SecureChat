@@ -512,6 +512,10 @@ function App() {
       uploadFile(file);
     }
   };
+  console.log("EncryptedBuffer size:", encryptedBuffer.byteLength);
+  console.log("AuthTag size:", authTag.length);
+  console.log("IV size:", iv.length);
+  console.log("FullData size:", fullData.length);
 
   const decryptAndDownloadFile = async (
     fileUrl,
