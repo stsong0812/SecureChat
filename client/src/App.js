@@ -554,11 +554,7 @@ function App() {
       if (authTag.length !== 16)
         throw new Error("Invalid AuthTag length. Expected 16 bytes.");
 
-      const fullData = new Uint8Array(
-        encryptedBuffer.byteLength + authTag.length
-      );
-      fullData.set(new Uint8Array(encryptedBuffer), 0); // ← ciphertext
-      // fullData.set(authTag, encryptedBuffer.byteLength);
+      const fullData = new Uint8Array(encryptedBuffer); // AuthTag is already included
 
       console.log("EncryptedBuffer size:", encryptedBuffer.byteLength);
       console.log("AuthTag size:", authTag.length);
