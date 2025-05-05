@@ -50,16 +50,6 @@ const encryptMessage = async (text, key) => {
   return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
 };
 
-const encryptFileChunk = async (chunk, key) => {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    chunk
-  );
-  return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
-};
-
 // Parse markdown-like syntax to HTML
 const parseFormattedText = (text) => {
   let formatted = text
