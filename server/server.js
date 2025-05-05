@@ -479,7 +479,8 @@ wss.on("connection", (socket) => {
 
               const uniqueFileName = `${uploadId}_${upload.fileName}.enc`;
               const filePath = path.join(uploadsDir, uniqueFileName);
-              fs.writeFileSync(filePath, fileBuffer); // Save raw ciphertext as-is
+              const fullData = Buffer.concat([fileBuffer, authTag]);
+              fs.writeFileSync(filePath, fullData); // Save ciphertext + authTag
 
               const fileUrl = `/Uploads/${uniqueFileName}`;
 
