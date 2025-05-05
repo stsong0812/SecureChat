@@ -50,39 +50,6 @@ const encryptMessage = async (text, key) => {
   return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
 };
 
-const decryptMessage = async (encrypted, key) => {
-  if (typeof encrypted === "string") return encrypted; // Handle plain text
-  try {
-    const decoder = new TextDecoder();
-    const iv = new Uint8Array(
-      messages
-        .find((m) => m.fileUrl === fileUrl)
-        ?.iv?.match(/.{1,2}/g)
-        .map((byte) => parseInt(byte, 16)) || []
-    );
-    const tag = new Uint8Array(
-      messages
-        .find((m) => m.fileUrl === fileUrl)
-        ?.authTag?.match(/.{1,2}/g)
-        .map((byte) => parseInt(byte, 16)) || []
-    );
-
-    // Merge ciphertext + authTag as required by SubtleCrypto
-    const fullData = new Uint8Array([...new Uint8Array(encryptedData), ...tag]);
-
-    const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      roomKeysRef.current[currentRoom],
-      fullData
-    );
-
-    return decoder.decode(decrypted);
-  } catch (error) {
-    console.error("Decryption failed:", error, "Encrypted content:", encrypted);
-    return "[Decryption Error]";
-  }
-};
-
 const encryptFileChunk = async (chunk, key) => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
@@ -431,6 +398,7 @@ function App() {
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     let key = roomKeysRef.current[currentRoom];
     if (!key && currentRoom === "general") {
       key = await deriveRoomKey("general");
@@ -442,22 +410,13 @@ function App() {
       return;
     }
 
-    // Ensure file buffer is ready
     const fileBuffer = await file.arrayBuffer();
+
+    // Plaintext path (non-general rooms)
     if (currentRoom !== "general") {
-      // Non-encrypted file upload (non-general room)
       const chunks = [new Uint8Array(fileBuffer)];
       const totalChunks = 1;
-      console.log("SENDING FILE START:", {
-        type: "file_start",
-        uploadId,
-        fileName: file.name,
-        fileSize: file.size,
-        totalChunks,
-        iv: ivHex,
-        authTag: authTagHex,
-      });
-      
+
       ws.send(
         JSON.stringify({
           type: "file_start",
@@ -465,11 +424,11 @@ function App() {
           fileName: file.name,
           fileSize: file.size,
           totalChunks,
-          iv: "", // empty for plaintext
+          iv: "", // no encryption
           authTag: "",
         })
       );
-    
+
       ws.send(
         JSON.stringify({
           type: "file_chunk",
@@ -478,12 +437,11 @@ function App() {
           data: Array.from(chunks[0]),
         })
       );
-    
-      return; // skip encryption logic
-    }
-    
+
+      return;
     }
 
+    // Encrypted path (general room)
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
@@ -495,30 +453,17 @@ function App() {
     const authTag = encryptedBytes.slice(-16); // last 16 bytes
     const ciphertext = encryptedBytes.slice(0, -16); // everything else
 
-    console.log("🟢 IV (12 bytes):", Array.from(iv));
-    console.log("🟢 AuthTag (16 bytes):", Array.from(authTag));
-    console.log("🟢 Ciphertext length:", ciphertext.length);
-
-    // Split ciphertext into chunks
     const chunks = [];
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, ciphertext.length);
       chunks.push(new Uint8Array(ciphertext.slice(start, end)));
     }
-    console.log("🟡 Sending file_start:", {
-      uploadId,
-      fileName: file.name,
-      fileSize: file.size,
-      totalChunks,
-      iv: Array.from(iv),
-      authTag: Array.from(authTag),
-    });
 
-    // Convert IV and AuthTag to hex before sending
     const ivHex = Array.from(iv)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
+
     const authTagHex = Array.from(authTag)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
@@ -535,17 +480,13 @@ function App() {
       })
     );
 
-    // Send encrypted chunks
     chunks.forEach((chunk, index) => {
-      console.log(
-        `🟢 Sending chunk ${index + 1}/${totalChunks} for ${uploadId}`
-      );
       ws.send(
         JSON.stringify({
           type: "file_chunk",
           uploadId,
           chunkIndex: index,
-          data: Array.from(chunk), // Send raw Uint8Array
+          data: Array.from(chunk),
         })
       );
     });
@@ -703,7 +644,12 @@ function App() {
                       <button
                         className="file-link"
                         onClick={() =>
-                          decryptAndDownloadFile(msg.fileUrl, msg.fileName)
+                          decryptAndDownloadFile(
+                            msg.fileUrl,
+                            msg.fileName,
+                            msg.iv,
+                            msg.authTag
+                          )
                         }
                       >
                         {msg.fileName}{" "}
@@ -773,5 +719,4 @@ function App() {
     </div>
   );
 }
-
 export default App;
