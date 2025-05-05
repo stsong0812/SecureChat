@@ -26,13 +26,12 @@ if (!fs.existsSync(dbDir)) {
 }
 
 try {
-  if (fs.existsSync(dbPath)) {
-    console.log(`Database exists at ${dbPath}. Skipping creation.`);
-  } else {
-    console.log(`Creating new database at ${dbPath}`);
-    const db = new Database(dbPath);
-    db.pragma(`key = "${dbKey}"`);
+  const dbExists = fs.existsSync(dbPath);
+  const db = new Database(dbPath);
+  db.pragma(`key = "${dbKey}"`);
 
+  if (!dbExists) {
+    console.log(`Creating new database at ${dbPath}`);
     db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,14 +64,31 @@ try {
         key TEXT
       );
     `);
-
     db.prepare(
       "INSERT OR IGNORE INTO rooms (name, isPublic, password, key) VALUES (?, ?, ?, ?)"
     ).run("general", 1, null, null);
 
     console.log('Database initialized with "general" room');
-    db.close();
+  } else {
+    console.log(`Database exists at ${dbPath}. Checking for migrations...`);
+
+    // Migrate 'files' table to add iv/authTag columns if missing
+    const columns = db.prepare("PRAGMA table_info(files)").all();
+
+    const hasIV = columns.some((col) => col.name === "iv");
+    const hasAuthTag = columns.some((col) => col.name === "authTag");
+
+    if (!hasIV) {
+      db.prepare("ALTER TABLE files ADD COLUMN iv TEXT").run();
+      console.log("✅ Added missing 'iv' column to files table.");
+    }
+    if (!hasAuthTag) {
+      db.prepare("ALTER TABLE files ADD COLUMN authTag TEXT").run();
+      console.log("✅ Added missing 'authTag' column to files table.");
+    }
   }
+
+  db.close();
 } catch (error) {
   console.error(`Failed to initialize database: ${error.message}`);
   process.exit(1);
