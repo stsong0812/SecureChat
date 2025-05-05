@@ -35,7 +35,7 @@ async function deriveGeneralRoomKey() {
 
 // Configuration from .env
 const PORT = process.env.PORT || 7777;
-const dbPath = process.env.DB_PATH || "/app/db/securechat.db";
+const dbPath = process.env.DB_PATH || "./db/securechat.db";
 const dbKey = process.env.SECRET_KEY;
 const publicDomain =
   process.env.PUBLIC_DOMAIN || "securechat-production-6fc4.up.railway.app";
