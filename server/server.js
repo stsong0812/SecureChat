@@ -438,7 +438,7 @@ wss.on("connection", (socket) => {
           const upload = uploads[uploadId];
 
           if (upload) {
-            const decodedChunk = JSON.parse(atob(chunkData));
+            upload.chunks[chunkIndex] = Buffer.from(chunkData);
             upload.chunks[chunkIndex] = Buffer.from(decodedChunk.data);
             upload.receivedChunks++;
 

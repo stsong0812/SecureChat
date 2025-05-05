@@ -480,7 +480,7 @@ function App() {
           type: "file_chunk",
           uploadId,
           chunkIndex: index,
-          data: btoa(String.fromCharCode(...chunk)),
+          data: JSON.stringify({ data: Array.from(chunk) }),
         })
       );
     });
