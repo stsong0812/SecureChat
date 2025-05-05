@@ -431,8 +431,11 @@ function App() {
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const key =
-      currentRoom === "general" ? roomKeysRef.current[currentRoom] : null;
+    let key = roomKeysRef.current[currentRoom];
+    if (!key && currentRoom === "general") {
+      key = await deriveRoomKey("general");
+      roomKeysRef.current.general = key;
+    }
 
     if (!key) {
       showPopupMessage("Missing encryption key for this room", "error");
@@ -560,7 +563,12 @@ function App() {
         throw new Error(`Failed to fetch file: ${response.statusText}`);
       const encryptedBuffer = await response.arrayBuffer();
 
-      const key = roomKeysRef.current[currentRoom];
+      let key = roomKeysRef.current[currentRoom];
+      if (!key && currentRoom === "general") {
+        key = await deriveRoomKey("general");
+        roomKeysRef.current.general = key;
+      }
+
       console.log("Decryption key:", key);
 
       // Replaced Buffer.from with hexToUint8Array
