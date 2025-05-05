@@ -444,11 +444,11 @@ function App() {
 
     // Ensure file buffer is ready
     const fileBuffer = await file.arrayBuffer();
-    if (!key) {
+    if (currentRoom !== "general") {
       // Non-encrypted file upload (non-general room)
       const chunks = [new Uint8Array(fileBuffer)];
       const totalChunks = 1;
-
+    
       ws.send(
         JSON.stringify({
           type: "file_start",
@@ -460,7 +460,7 @@ function App() {
           authTag: "",
         })
       );
-
+    
       ws.send(
         JSON.stringify({
           type: "file_chunk",
@@ -469,8 +469,10 @@ function App() {
           data: Array.from(chunks[0]),
         })
       );
-
+    
       return; // skip encryption logic
+    }
+    
     }
 
     const iv = crypto.getRandomValues(new Uint8Array(12));
