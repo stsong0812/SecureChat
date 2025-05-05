@@ -54,7 +54,7 @@ try {
         fileName TEXT,
         timestamp INTEGER
         aesKey TEXT,
-        iv TEXT
+        iv TEXT,
         authKey TEXT
       );
       CREATE TABLE IF NOT EXISTS rooms (
