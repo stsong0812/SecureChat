@@ -448,7 +448,16 @@ function App() {
       // Non-encrypted file upload (non-general room)
       const chunks = [new Uint8Array(fileBuffer)];
       const totalChunks = 1;
-    
+      console.log("SENDING FILE START:", {
+        type: "file_start",
+        uploadId,
+        fileName: file.name,
+        fileSize: file.size,
+        totalChunks,
+        iv: ivHex,
+        authTag: authTagHex,
+      });
+      
       ws.send(
         JSON.stringify({
           type: "file_start",
