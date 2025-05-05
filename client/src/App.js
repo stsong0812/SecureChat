@@ -558,7 +558,7 @@ function App() {
         encryptedBuffer.byteLength + authTag.length
       );
       fullData.set(new Uint8Array(encryptedBuffer), 0); // ← ciphertext
-      fullData.set(authTag, encryptedBuffer.byteLength);
+      // fullData.set(authTag, encryptedBuffer.byteLength);
 
       console.log("EncryptedBuffer size:", encryptedBuffer.byteLength);
       console.log("AuthTag size:", authTag.length);
