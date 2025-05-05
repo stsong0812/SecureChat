@@ -212,7 +212,7 @@ function App() {
     };
 
     initializeKeysAndWebSocket();
-    // add missing decryptMessage function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const decryptMessage = async (encrypted, key) => {
     try {
