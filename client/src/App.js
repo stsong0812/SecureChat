@@ -423,9 +423,16 @@ function App() {
   };
 
   const uploadFile = async (file) => {
+    console.log("Preparing to upload file:", file);
+    const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log("Generated uploadId:", uploadId);
+    if (!uploadId) {
+      showPopupMessage("❌ Upload ID is missing. Aborting upload.", "error");
+      return;
+    }
+
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
-    const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const key = roomKeysRef.current[currentRoom];
 
     if (!key) {
