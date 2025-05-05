@@ -423,16 +423,9 @@ function App() {
   };
 
   const uploadFile = async (file) => {
-    console.log("Preparing to upload file:", file);
-    const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    console.log("Generated uploadId:", uploadId);
-    if (!uploadId) {
-      showPopupMessage("❌ Upload ID is missing. Aborting upload.", "error");
-      return;
-    }
-
     const chunkSize = 64 * 1024; // 64KB
     const totalChunks = Math.ceil(file.size / chunkSize);
+    const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const key = roomKeysRef.current[currentRoom];
 
     if (!key) {
@@ -440,17 +433,22 @@ function App() {
       return;
     }
 
-    // Encrypt entire file to get IV + authTag
+    // Ensure file buffer is ready
+    const fileBuffer = await file.arrayBuffer();
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const fullEncrypted = await crypto.subtle.encrypt(
+    const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
-      await file.arrayBuffer()
+      fileBuffer
     );
 
-    const encryptedBytes = new Uint8Array(fullEncrypted);
+    const encryptedBytes = new Uint8Array(encrypted);
     const authTag = encryptedBytes.slice(-16); // last 16 bytes
     const ciphertext = encryptedBytes.slice(0, -16); // everything else
+
+    console.log("🟢 IV (12 bytes):", Array.from(iv));
+    console.log("🟢 AuthTag (16 bytes):", Array.from(authTag));
+    console.log("🟢 Ciphertext length:", ciphertext.length);
 
     // Split ciphertext into chunks
     const chunks = [];
@@ -460,7 +458,7 @@ function App() {
       chunks.push(ciphertext.slice(start, end));
     }
 
-    // Send file_start with IV and authTag
+    // Send file_start with IV and AuthTag
     ws.send(
       JSON.stringify({
         type: "file_start",
@@ -480,7 +478,7 @@ function App() {
           type: "file_chunk",
           uploadId,
           chunkIndex: index,
-          data: JSON.stringify({ data: Array.from(chunk) }),
+          data: Array.from(chunk), // ← Send raw Uint8Array, not base64 or JSON
         })
       );
     });
