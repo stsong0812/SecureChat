@@ -449,8 +449,8 @@ wss.on("connection", (socket) => {
           totalChunks,
           receivedChunks: 0,
           chunks: new Array(totalChunks).fill(null),
-          iv: Buffer.from(iv),
-          authTag: Buffer.from(authTag),
+          iv: Buffer.from(iv, "hex"),
+          authTag: Buffer.from(authTag, "hex"),
         };
         console.log("🟢 Current uploads after file_start:", uploads);
 
