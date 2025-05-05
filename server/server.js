@@ -398,16 +398,31 @@ wss.on("connection", (socket) => {
       }
     } else if (type === "file_start") {
       if (socket.authenticated) {
-        const { uploadId, fileName, fileSize, totalChunks } = data;
+        // Extract iv and authTag from the message
+        const { uploadId, fileName, fileSize, totalChunks, iv, authTag } = data;
+
+        // Safety check to avoid undefined errors
+        if (!iv || !authTag) {
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              message: "Missing IV/authTag in file_start",
+            })
+          );
+          return;
+        }
+
+        // Properly save file metadata in memory
         uploads[uploadId] = {
           fileName,
           fileSize,
           totalChunks,
           receivedChunks: 0,
           chunks: new Array(totalChunks).fill(null),
-          iv: Array.from(iv),
-          authTag: Array.from(authTag),
+          iv: Buffer.from(iv),
+          authTag: Buffer.from(authTag),
         };
+
         socket.send(
           JSON.stringify({ type: "status", message: "File upload started" })
         );
