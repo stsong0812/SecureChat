@@ -290,6 +290,14 @@ wss.on("connection", (socket) => {
       const user = db
         .prepare("SELECT password FROM users WHERE username = ?")
         .get(username);
+
+      // online status
+      broadcastToAll({
+        type: "user_status",
+        username,
+        stats: "online",
+      });
+
       if (user && bcrypt.compareSync(password, user.password)) {
         socket.authenticated = true;
         socket.username = username;
@@ -545,6 +553,11 @@ wss.on("connection", (socket) => {
     console.log("Client disconnected from:", socket._socket.remoteAddress);
     for (let [username, client] of clients) {
       if (client === socket) clients.delete(username);
+      broadcastToAll({
+        type: "user_status",
+        username,
+        stats: "offline",
+      });
     }
   });
 });
