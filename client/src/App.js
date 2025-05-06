@@ -344,7 +344,7 @@ function App() {
       return;
     }
     if (message.trim()) {
-      if (message.trim() === "help") {
+      if (message.trim() === "/help") {
         const helpText = [
           "*bold* → bold",
           "_italic_ → italic",
@@ -843,7 +843,6 @@ function App() {
     ))}
 </div>
 */}
-            */
           </div>
         </div>
       )}
