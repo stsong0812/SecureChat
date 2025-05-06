@@ -305,7 +305,7 @@ wss.on("connection", (socket) => {
 
         broadcastToAll({
           type: "user_status",
-          username,
+          sender: username,
           status: "online",
         });
 
@@ -575,7 +575,7 @@ wss.on("connection", (socket) => {
     }
     broadcastToAll({
       type: "user_status",
-      username: socket.username,
+      sender: socket.username,
       status: "offline",
     });
   });
@@ -672,7 +672,7 @@ setInterval(() => {
       clients.delete(username);
       broadcastToAll({
         type: "user_status",
-        username,
+        sender: username,
         status: "offline",
       });
     }
