@@ -4,9 +4,9 @@
   "description": "CPSC-455 Web Application Security: Web-based realtime chatting application implemented using Websockets.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "cd client && npm install && npm run build"
-  },
+  "postinstall": "cd client && npm install && npm run build",
+  "start": "node server/server.js"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stsong0812/SecureChat.git"
