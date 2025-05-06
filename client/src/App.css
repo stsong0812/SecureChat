@@ -269,3 +269,25 @@ body {
   height: 100%;
   overflow-y: auto;
 }
+.chat-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.chat-main {
+  flex: 1;
+}
+
+.user-list {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 12px;
+  margin-left: 12px;
+  height: 100%;
+  overflow-y: auto;
+  color: white;
+  font-size: 14px;
+  width: 180px;
+  max-height: 400px;
+}
