@@ -355,41 +355,26 @@ function App() {
         helpText.forEach((line) => {
           setMessages((prev) => [
             ...prev,
-            {
-              type: "system",
-              command: "help",
-              output: [
-                "*bold* → bold",
-                "_italic_ → italic",
-                "[text](url) → clickable link",
-                "/create roomName [public|private] [password] → create a chat room",
-                "/users → list all users with status",
-              ],
-            },
+            { type: "text", content: `system: ${line}` },
           ]);
-          setMessage("");
-          return;
         });
-        if (message.trim() === "/users") {
-          const userLines = allUsers.map((user) => {
-            const isOnline = userStatuses[user] === "online";
-            const dot = `<span style="color: ${
-              isOnline ? "limegreen" : "gray"
-            };">●</span>`;
-            return `${dot} ${user}`;
-          });
-
+        setMessage("");
+        return;
+      }
+      if (message.trim() === "/users") {
+        allUsers.forEach((user) => {
+          const isOnline = userStatuses[user] === "online";
+          const dot = `<span style="color: ${
+            isOnline ? "limegreen" : "gray"
+          };">●</span>`;
+          const line = `${dot} ${user}`;
           setMessages((prev) => [
             ...prev,
-            {
-              type: "system",
-              command: "/users",
-              output: userLines,
-            },
+            { type: "text", content: `system: ${line}` },
           ]);
-          setMessage("");
-          return;
-        }
+        });
+        setMessage("");
+        return;
       }
 
       if (message.startsWith("/create ")) {
@@ -858,6 +843,7 @@ function App() {
     ))}
 </div>
 */}
+            */
           </div>
         </div>
       )}
