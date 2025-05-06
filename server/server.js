@@ -294,6 +294,13 @@ wss.on("connection", (socket) => {
         socket.authenticated = true;
         socket.username = username;
         clients.set(username, socket);
+
+        broadcastToAll({
+          type: "user_status",
+          username,
+          status: "online",
+        });
+
         socket.send(
           JSON.stringify({ type: "status", message: "Logged in successfully" })
         );
@@ -538,6 +545,18 @@ wss.on("connection", (socket) => {
           JSON.stringify({ type: "error", message: "Please log in first" })
         );
       }
+    } else if (type === "typing") {
+      // Broadcast to others in the same room that this user is typing
+      broadcast(socket.room, {
+        type: "typing",
+        sender: socket.username,
+      });
+    } else if (type === "stop_typing") {
+      // Broadcast to others in the same room that this user stopped typing
+      broadcast(socket.room, {
+        type: "stop_typing",
+        sender: socket.username,
+      });
     }
   });
 
@@ -546,6 +565,11 @@ wss.on("connection", (socket) => {
     for (let [username, client] of clients) {
       if (client === socket) clients.delete(username);
     }
+    broadcastToAll({
+      type: "user_status",
+      username: socket.username,
+      status: "offline",
+    });
   });
 });
 

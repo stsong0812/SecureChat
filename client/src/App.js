@@ -83,6 +83,7 @@ function App() {
   const roomKeysRef = useRef({}); // Only used for "general"
   const pendingMessagesRef = useRef({}); // Map of roomName to pending messages
   const fileInputRef = useRef(null);
+  const [typingUser, setTypingUser] = useState(null);
 
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
@@ -186,6 +187,10 @@ function App() {
               const newRooms = [...prevRooms, room];
               return newRooms;
             });
+          } else if (type === "typing") {
+            if (sender !== username) setTypingUser(sender);
+          } else if (type === "stop_typing") {
+            if (sender !== username) setTypingUser(null);
           }
         } catch (error) {
           console.error(
@@ -378,6 +383,21 @@ function App() {
       setSelectedRoom(roomName);
       setShowPasswordInput(true);
     }
+  };
+
+  let typingTimeout;
+
+  const handleTyping = () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
+
+    // Send "typing" event to server
+    ws.send(JSON.stringify({ type: "typing", room: currentRoom }));
+
+    // Reset typing timeout
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      ws.send(JSON.stringify({ type: "stop_typing", room: currentRoom }));
+    }, 3000); // User stops typing after 3 seconds of inactivity
   };
 
   const handleJoinPrivateRoom = () => {
@@ -697,10 +717,14 @@ function App() {
             <input
               type="text"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                handleTyping(); // Notify server that user is typing
+              }}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
             />
+
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
               🤫
             </button>
