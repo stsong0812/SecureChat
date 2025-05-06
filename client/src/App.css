@@ -207,20 +207,6 @@ body {
   color: #0000ff;
 }
 
-.user-list {
-  position: absolute;
-  right: 20px;
-  top: 60px;
-  background-color: #111;
-  padding: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  width: 180px;
-  height: 80%;
-  overflow-y: auto;
-  color: white;
-  font-size: 14px;
-}
-
 .user-entry {
   display: flex;
   align-items: center;
@@ -281,13 +267,16 @@ body {
 }
 
 .user-list {
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  padding-left: 12px;
-  margin-left: 12px;
-  height: 100%;
-  overflow-y: auto;
-  color: white;
-  font-size: 14px;
+  position: fixed;
+  top: 80px;
+  right: 30px;
   width: 180px;
-  max-height: 400px;
+  background-color: #0d1117;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+  padding: 10px;
+  color: white;
+  font-family: 'Fira Mono', monospace;
+  z-index: 1000;
+  max-height: 80vh;
+  overflow-y: auto;
 }
