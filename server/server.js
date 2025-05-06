@@ -295,7 +295,7 @@ wss.on("connection", (socket) => {
       broadcastToAll({
         type: "user_status",
         username,
-        stats: "online",
+        status: "online",
       });
 
       if (user && bcrypt.compareSync(password, user.password)) {
@@ -556,7 +556,7 @@ wss.on("connection", (socket) => {
       broadcastToAll({
         type: "user_status",
         username,
-        stats: "offline",
+        status: "offline",
       });
     }
   });

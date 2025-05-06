@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
-import { broadcastTyping, broadcastOnlineStatus } from "./indicators";
+import { broadcastTyping, broadcastOnlineStatus } from "./client/indicators";
 
 // Encryption utilities (only used for "general" room)
 const deriveRoomKey = async (roomName) => {
@@ -84,6 +84,7 @@ function App() {
   const roomKeysRef = useRef({}); // Only used for "general"
   const pendingMessagesRef = useRef({}); // Map of roomName to pending messages
   const fileInputRef = useRef(null);
+  const [userStatuses, setUserStatuses] = useState({});
 
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
@@ -144,6 +145,11 @@ function App() {
                   await processTextMessage(msg.sender, msg.content, roomName);
                 }
               }
+            } else if (type === "user_status") {
+              setUserStatuses((prev) => ({
+                ...prev,
+                [data.username]: data.status,
+              }));
             } else if (message === "Logged in successfully") {
               setLoggedIn(true);
               websocket.send(JSON.stringify({ type: "get_rooms" }));
@@ -643,11 +649,28 @@ function App() {
             {messages.map((msg, i) => {
               if (msg.type === "text") {
                 return (
-                  <div
-                    key={i}
-                    className="message"
-                    dangerouslySetInnerHTML={{ __html: msg.content }}
-                  />
+                  <div key={i} className="message">
+                    {" "}
+                    // online offline status
+                    {(() => {
+                      const sender = msg.content?.split(":")[0];
+                      const status = userStatuses[sender];
+                      const emoji =
+                        status === "online"
+                          ? "🟢"
+                          : status === "offline"
+                          ? "🔴"
+                          : "⚪️";
+                      return (
+                        <>
+                          <span>{emoji} </span>
+                          <span
+                            dangerouslySetInnerHTML={{ __html: msg.content }}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
                 );
               } else if (msg.type === "file") {
                 if (isImage(msg.fileName)) {
