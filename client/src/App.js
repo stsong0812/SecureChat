@@ -343,213 +343,173 @@ function App() {
       showPopupMessage("Not logged in or WebSocket not connected", "error");
       return;
     }
-    if (message.trim()) {
-      if (message.trim() === "help") {
-        const helpText = [
-          "*bold* → bold",
-          "_italic_ → italic",
-          "[text](url) → clickable link",
-          "/create roomName [public|private] [password] → create a chat room",
-          "/users → list all users with status",
-        ];
+    if (message.trim() === "/help") {
+      const helpText = [
+        "*bold* → bold",
+        "_italic_ → italic",
+        "[text](url) → clickable link",
+        "/create roomName [public|private] [password] → create a chat room",
+        "/users → list all users with status",
+      ];
 
-        if (message.trim() === "/users") {
-          const userLines = allUsers.map((user) => {
-            const isOnline = userStatuses[user] === "online";
-            const dot = `<span style="color: ${
-              isOnline ? "limegreen" : "gray"
-            };">●</span>`;
-            return `${dot} ${user}`;
-          });
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: "system",
+          command: "help",
+          output: helpText,
+        },
+      ]);
+      setMessage("");
+      return;
+    }
 
-          setMessages((prev) => [
-            ...prev,
-            {
-              type: "system",
-              command: "/users",
-              output: userLines,
-            },
-          ]);
-          setMessage("");
-          return;
-        }
+    if (message.trim() === "/users") {
+      const userLines = allUsers.map((user) => {
+        const isOnline = userStatuses[user] === "online";
+        const dot = `<span style="color: ${
+          isOnline ? "limegreen" : "gray"
+        };">●</span>`;
+        return `${dot} ${user}`;
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: "system",
+          command: "/users",
+          output: userLines,
+        },
+      ]);
+      setMessage("");
+      return;
+    }
+
+    if (message.startsWith("/create ")) {
+      const parts = message.split(" ");
+
+      if (parts.length < 2) {
+        showPopupMessage(
+          "Usage: /create roomName [public|private] [password]",
+          "error"
+        );
+        return;
       }
-
-      if (message.startsWith("/create ")) {
-        const parts = message.split(" ");
-        if (parts.length < 2) {
+      const roomName = parts[1];
+      const visibility = parts[2] || "public";
+      const password = parts[3] || "";
+      const isPublic = visibility === "public";
+      ws.send(
+        JSON.stringify({ type: "create_room", roomName, isPublic, password })
+      );
+      setTimeout(() => {
+        ws.send(JSON.stringify({ type: "join", room: roomName }));
+        setCurrentRoom(roomName);
+        console.log(`Auto-joined room '${roomName}'`);
+      }, 500);
+    } else {
+      console.log("Sending message:", message, "in room:", currentRoom);
+      if (currentRoom === "general") {
+        if (!roomKeysRef.current[currentRoom]) {
           showPopupMessage(
-            "Usage: /create roomName [public|private] [password]",
+            `No key for room '${currentRoom}', please rejoin`,
             "error"
           );
           return;
         }
-        const roomName = parts[1];
-        const visibility = parts[2] || "public";
-        const password = parts[3] || "";
-        const isPublic = visibility === "public";
-        ws.send(
-          JSON.stringify({ type: "create_room", roomName, isPublic, password })
+        console.log(
+          "Using encryption key for",
+          currentRoom,
+          ":",
+          roomKeysRef.current[currentRoom]
         );
-        setTimeout(() => {
-          ws.send(JSON.stringify({ type: "join", room: roomName }));
-          setCurrentRoom(roomName);
-          console.log(`Auto-joined room '${roomName}'`);
-        }, 500);
+        const encrypted = await encryptMessage(
+          message,
+          roomKeysRef.current[currentRoom]
+        );
+        console.log("Encrypted message sent:", encrypted);
+        ws.send(JSON.stringify({ type: "text", content: encrypted }));
       } else {
-        console.log("Sending message:", message, "in room:", currentRoom);
-        if (currentRoom === "general") {
-          if (!roomKeysRef.current[currentRoom]) {
-            showPopupMessage(
-              `No key for room '${currentRoom}', please rejoin`,
-              "error"
-            );
-            return;
-          }
-          console.log(
-            "Using encryption key for",
-            currentRoom,
-            ":",
-            roomKeysRef.current[currentRoom]
-          );
-          const encrypted = await encryptMessage(
-            message,
-            roomKeysRef.current[currentRoom]
-          );
-          console.log("Encrypted message sent:", encrypted);
-          ws.send(JSON.stringify({ type: "text", content: encrypted }));
-        } else {
-          console.log(`Sending plain text for '${currentRoom}'`);
-          ws.send(JSON.stringify({ type: "text", content: message }));
-        }
-        setMessage("");
+        console.log(`Sending plain text for '${currentRoom}'`);
+        ws.send(JSON.stringify({ type: "text", content: message }));
       }
+      setMessage("");
     }
   };
+}
 
-  const handleRoomChange = (e) => {
-    const roomName = e.target.value;
-    if (!roomName) return;
-    const room = rooms.find((r) => r.name === roomName);
-    if (room.isPublic) {
-      console.log("Switching to room:", roomName);
-      ws.send(JSON.stringify({ type: "join", room: roomName }));
-    } else {
-      setSelectedRoom(roomName);
-      setShowPasswordInput(true);
-    }
-  };
+const handleRoomChange = (e) => {
+  const roomName = e.target.value;
+  if (!roomName) return;
+  const room = rooms.find((r) => r.name === roomName);
+  if (room.isPublic) {
+    console.log("Switching to room:", roomName);
+    ws.send(JSON.stringify({ type: "join", room: roomName }));
+  } else {
+    setSelectedRoom(roomName);
+    setShowPasswordInput(true);
+  }
+};
 
-  let typingTimeout;
+let typingTimeout;
 
-  const handleTyping = () => {
-    if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
+const handleTyping = () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
 
-    // Send "typing" event to server
-    ws.send(JSON.stringify({ type: "typing", room: currentRoom }));
+  // Send "typing" event to server
+  ws.send(JSON.stringify({ type: "typing", room: currentRoom }));
 
-    // Reset typing timeout
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-      ws.send(JSON.stringify({ type: "stop_typing", room: currentRoom }));
-    }, 3000); // User stops typing after 3 seconds of inactivity
-  };
+  // Reset typing timeout
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    ws.send(JSON.stringify({ type: "stop_typing", room: currentRoom }));
+  }, 3000); // User stops typing after 3 seconds of inactivity
+};
 
-  const handleJoinPrivateRoom = () => {
-    if (!passwordInput) {
-      showPopupMessage("Password required for private room", "error");
-      return;
-    }
-    console.log("Joining private room:", selectedRoom);
-    ws.send(
-      JSON.stringify({
-        type: "join",
-        room: selectedRoom,
-        password: passwordInput,
-      })
-    );
-    setShowPasswordInput(false);
-    setPasswordInput("");
-  };
+const handleJoinPrivateRoom = () => {
+  if (!passwordInput) {
+    showPopupMessage("Password required for private room", "error");
+    return;
+  }
+  console.log("Joining private room:", selectedRoom);
+  ws.send(
+    JSON.stringify({
+      type: "join",
+      room: selectedRoom,
+      password: passwordInput,
+    })
+  );
+  setShowPasswordInput(false);
+  setPasswordInput("");
+};
 
-  const uploadFile = async (file) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      showPopupMessage("WebSocket not connected", "error");
-      return;
-    }
+const uploadFile = async (file) => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showPopupMessage("WebSocket not connected", "error");
+    return;
+  }
 
-    const chunkSize = 64 * 1024; // 64KB
-    const totalChunks = Math.ceil(file.size / chunkSize);
-    const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const chunkSize = 64 * 1024; // 64KB
+  const totalChunks = Math.ceil(file.size / chunkSize);
+  const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    let key = roomKeysRef.current[currentRoom];
-    if (!key && currentRoom === "general") {
-      key = await deriveRoomKey("general");
-      roomKeysRef.current.general = key;
-    }
+  let key = roomKeysRef.current[currentRoom];
+  if (!key && currentRoom === "general") {
+    key = await deriveRoomKey("general");
+    roomKeysRef.current.general = key;
+  }
 
-    if (!key) {
-      showPopupMessage("Missing encryption key for this room", "error");
-      return;
-    }
+  if (!key) {
+    showPopupMessage("Missing encryption key for this room", "error");
+    return;
+  }
 
-    const fileBuffer = await file.arrayBuffer();
+  const fileBuffer = await file.arrayBuffer();
 
-    // Plaintext path (non-general rooms)
-    if (currentRoom !== "general") {
-      const chunks = [new Uint8Array(fileBuffer)];
-      const totalChunks = 1;
-
-      ws.send(
-        JSON.stringify({
-          type: "file_start",
-          uploadId,
-          fileName: file.name,
-          fileSize: file.size,
-          totalChunks,
-          iv: "", // no encryption
-          authTag: "",
-        })
-      );
-
-      ws.send(
-        JSON.stringify({
-          type: "file_chunk",
-          uploadId,
-          chunkIndex: 0,
-          data: Array.from(chunks[0]),
-        })
-      );
-
-      return;
-    }
-
-    // Encrypted path (general room)
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encrypted = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      key,
-      fileBuffer
-    );
-
-    const encryptedBytes = new Uint8Array(encrypted);
-    const authTag = encryptedBytes.slice(-16); // last 16 bytes
-    const ciphertext = encryptedBytes.slice(0, -16); // everything else
-
-    const chunks = [];
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, ciphertext.length);
-      chunks.push(new Uint8Array(ciphertext.slice(start, end)));
-    }
-
-    const ivHex = Array.from(iv)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-    const authTagHex = Array.from(authTag)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+  // Plaintext path (non-general rooms)
+  if (currentRoom !== "general") {
+    const chunks = [new Uint8Array(fileBuffer)];
+    const totalChunks = 1;
 
     ws.send(
       JSON.stringify({
@@ -558,288 +518,334 @@ function App() {
         fileName: file.name,
         fileSize: file.size,
         totalChunks,
-        iv: ivHex,
-        authTag: authTagHex,
+        iv: "", // no encryption
+        authTag: "",
       })
     );
 
-    chunks.forEach((chunk, index) => {
-      ws.send(
-        JSON.stringify({
-          type: "file_chunk",
-          uploadId,
-          chunkIndex: index,
-          data: Array.from(chunk),
-        })
-      );
-    });
-  };
+    ws.send(
+      JSON.stringify({
+        type: "file_chunk",
+        uploadId,
+        chunkIndex: 0,
+        data: Array.from(chunks[0]),
+      })
+    );
 
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      uploadFile(file);
+    return;
+  }
+
+  // Encrypted path (general room)
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    fileBuffer
+  );
+
+  const encryptedBytes = new Uint8Array(encrypted);
+  const authTag = encryptedBytes.slice(-16); // last 16 bytes
+  const ciphertext = encryptedBytes.slice(0, -16); // everything else
+
+  const chunks = [];
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, ciphertext.length);
+    chunks.push(new Uint8Array(ciphertext.slice(start, end)));
+  }
+
+  const ivHex = Array.from(iv)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const authTagHex = Array.from(authTag)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  ws.send(
+    JSON.stringify({
+      type: "file_start",
+      uploadId,
+      fileName: file.name,
+      fileSize: file.size,
+      totalChunks,
+      iv: ivHex,
+      authTag: authTagHex,
+    })
+  );
+
+  chunks.forEach((chunk, index) => {
+    ws.send(
+      JSON.stringify({
+        type: "file_chunk",
+        uploadId,
+        chunkIndex: index,
+        data: Array.from(chunk),
+      })
+    );
+  });
+};
+
+const handleFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    uploadFile(file);
+  }
+};
+
+const decryptAndDownloadFile = async (fileUrl, fileName, ivHex, authTagHex) => {
+  try {
+    console.log("Decrypting file:", fileUrl);
+    console.log("IV HEX:", ivHex);
+    console.log("AuthTag HEX:", authTagHex);
+
+    const response = await fetch(fileUrl);
+    if (!response.ok)
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
+    const encryptedBuffer = await response.arrayBuffer();
+
+    let key = roomKeysRef.current[currentRoom];
+    if (!key && currentRoom === "general") {
+      key = await deriveRoomKey("general");
+      roomKeysRef.current.general = key;
     }
-  };
 
-  const decryptAndDownloadFile = async (
-    fileUrl,
-    fileName,
-    ivHex,
-    authTagHex
-  ) => {
-    try {
-      console.log("Decrypting file:", fileUrl);
-      console.log("IV HEX:", ivHex);
-      console.log("AuthTag HEX:", authTagHex);
+    console.log("Decryption key:", key);
 
-      const response = await fetch(fileUrl);
-      if (!response.ok)
-        throw new Error(`Failed to fetch file: ${response.statusText}`);
-      const encryptedBuffer = await response.arrayBuffer();
-
-      let key = roomKeysRef.current[currentRoom];
-      if (!key && currentRoom === "general") {
-        key = await deriveRoomKey("general");
-        roomKeysRef.current.general = key;
+    // Replaced Buffer.from with hexToUint8Array
+    const hexToUint8Array = (hex) => {
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
       }
+      return bytes;
+    };
 
-      console.log("Decryption key:", key);
+    const iv = hexToUint8Array(ivHex);
+    const authTag = hexToUint8Array(authTagHex);
 
-      // Replaced Buffer.from with hexToUint8Array
-      const hexToUint8Array = (hex) => {
-        const bytes = new Uint8Array(hex.length / 2);
-        for (let i = 0; i < hex.length; i += 2) {
-          bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-        }
-        return bytes;
-      };
+    if (iv.length !== 12)
+      throw new Error("Invalid IV length. Expected 12 bytes.");
+    if (authTag.length !== 16)
+      throw new Error("Invalid AuthTag length. Expected 16 bytes.");
 
-      const iv = hexToUint8Array(ivHex);
-      const authTag = hexToUint8Array(authTagHex);
+    const fullData = new Uint8Array(
+      encryptedBuffer.byteLength + authTag.length
+    );
+    fullData.set(new Uint8Array(encryptedBuffer), 0);
+    fullData.set(authTag, encryptedBuffer.byteLength);
 
-      if (iv.length !== 12)
-        throw new Error("Invalid IV length. Expected 12 bytes.");
-      if (authTag.length !== 16)
-        throw new Error("Invalid AuthTag length. Expected 16 bytes.");
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      fullData
+    );
 
-      const fullData = new Uint8Array(
-        encryptedBuffer.byteLength + authTag.length
-      );
-      fullData.set(new Uint8Array(encryptedBuffer), 0);
-      fullData.set(authTag, encryptedBuffer.byteLength);
+    const blob = new Blob([decrypted]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("File decryption failed:", error);
+    showPopupMessage("Failed to decrypt file", "error");
+  }
+};
 
-      const decrypted = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv },
-        key,
-        fullData
-      );
-
-      const blob = new Blob([decrypted]);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("File decryption failed:", error);
-      showPopupMessage("Failed to decrypt file", "error");
-    }
-  };
-
-  /* const isImage = (fileName) => {
+/* const isImage = (fileName) => {
     const ext = fileName.split(".").pop().toLowerCase();
     return ["jpg", "jpeg", "png", "gif"].includes(ext);
   
 }*/
 
-  return (
-    <div className="terminal">
-      <div className="header">securechat@localhost:~$</div>
-      {showPopup && <div className={`popup ${popupType}`}>{popupMessage}</div>}
-      {!loggedIn ? (
-        <div className="login">
-          <div className="prompt">
-            username:{" "}
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-          <div className="prompt">
-            password:{" "}
+return (
+  <div className="terminal">
+    <div className="header">securechat@localhost:~$</div>
+    {showPopup && <div className={`popup ${popupType}`}>{popupMessage}</div>}
+    {!loggedIn ? (
+      <div className="login">
+        <div className="prompt">
+          username:{" "}
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </div>
+        <div className="prompt">
+          password:{" "}
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+        <div className="commands">
+          <span className="command" onClick={register}>
+            register
+          </span>
+          <span className="command" onClick={login}>
+            login
+          </span>
+        </div>
+      </div>
+    ) : (
+      <div className="chat">
+        <div className="room-controls">
+          <span>Current room: {currentRoom}</span>
+          <select value={currentRoom} onChange={handleRoomChange}>
+            {rooms.map((room) => (
+              <option key={room.name} value={room.name}>
+                {room.name} {room.isPublic ? "(public)" : "(private)"}
+              </option>
+            ))}
+          </select>
+          <button onClick={logout}>Logout</button>
+        </div>
+        {showPasswordInput && (
+          <div className="password-prompt">
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder={`Password for ${selectedRoom}`}
             />
+            <button onClick={handleJoinPrivateRoom}>Join</button>
           </div>
-          <div className="commands">
-            <span className="command" onClick={register}>
-              register
-            </span>
-            <span className="command" onClick={login}>
-              login
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="chat">
-          <div className="room-controls">
-            <span>Current room: {currentRoom}</span>
-            <select value={currentRoom} onChange={handleRoomChange}>
-              {rooms.map((room) => (
-                <option key={room.name} value={room.name}>
-                  {room.name} {room.isPublic ? "(public)" : "(private)"}
-                </option>
-              ))}
-            </select>
-            <button onClick={logout}>Logout</button>
-          </div>
-          {showPasswordInput && (
-            <div className="password-prompt">
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder={`Password for ${selectedRoom}`}
-              />
-              <button onClick={handleJoinPrivateRoom}>Join</button>
+        )}
+        <div className="messages">
+          {messages.map((msg, i) => {
+            if (msg.type === "system") {
+              return (
+                <div
+                  key={i}
+                  className="message"
+                  style={{ fontFamily: "Fira Mono, monospace" }}
+                >
+                  <div style={{ color: "#00ff00", marginBottom: "4px" }}>
+                    {username}@localhost:~$ {msg.command}
+                  </div>
+                  <div>
+                    {Array.isArray(msg.output) ? (
+                      msg.output.map((line, index) => (
+                        <div
+                          key={index}
+                          dangerouslySetInnerHTML={{ __html: line }}
+                        />
+                      ))
+                    ) : (
+                      <div dangerouslySetInnerHTML={{ __html: msg.output }} />
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            // text messages
+            if (msg.type === "text") {
+              // split “sender: HTML” into sender + body
+              const [sender, ...rest] = msg.content.split(": ");
+              const bodyHtml = rest.join(": ");
+              const isOnline = userStatuses[sender] === "online";
+
+              return (
+                <div key={i} className="message">
+                  <strong>
+                    <span
+                      className="status-circle"
+                      style={{
+                        backgroundColor: isOnline ? "limegreen" : "gray",
+                      }}
+                    />
+                    {sender}:
+                  </strong>{" "}
+                  <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                </div>
+              );
+            }
+
+            // file messages
+            if (msg.type === "file") {
+              const isOnline = userStatuses[msg.sender] === "online";
+              return (
+                <div key={i} className="message">
+                  <strong>
+                    <span
+                      className="status-circle"
+                      style={{
+                        backgroundColor: isOnline ? "limegreen" : "gray",
+                      }}
+                    />
+                    {msg.sender}:
+                  </strong>{" "}
+                  <button
+                    className="file-link"
+                    onClick={() =>
+                      decryptAndDownloadFile(
+                        msg.fileUrl,
+                        msg.fileName,
+                        msg.iv,
+                        msg.authTag
+                      )
+                    }
+                  >
+                    {msg.fileName}{" "}
+                    {currentRoom === "general" ? "(encrypted)" : ""}
+                  </button>
+                </div>
+              );
+            }
+
+            return null;
+          })}
+
+          {/* typing notification */}
+          {typingUser && (
+            <div className="typing-indicator">
+              <span>{typingUser} is typing</span>
+              <span className="typing-dots">
+                <span>.</span>
+                <span>.</span>
+                <span>.</span>
+              </span>
             </div>
           )}
-          <div className="messages">
-            {messages.map((msg, i) => {
-              if (msg.type === "system") {
-                return (
-                  <div
-                    key={i}
-                    className="message"
-                    style={{ fontFamily: "Fira Mono, monospace" }}
-                  >
-                    <div style={{ color: "#00ff00", marginBottom: "4px" }}>
-                      {username}@localhost:~$ {msg.command}
-                    </div>
-                    <div>
-                      {Array.isArray(msg.output) ? (
-                        msg.output.map((line, index) => (
-                          <div
-                            key={index}
-                            dangerouslySetInnerHTML={{ __html: line }}
-                          />
-                        ))
-                      ) : (
-                        <div dangerouslySetInnerHTML={{ __html: msg.output }} />
-                      )}
-                    </div>
-                  </div>
-                );
-              }
+        </div>
 
-              // text messages
-              if (msg.type === "text") {
-                // split “sender: HTML” into sender + body
-                const [sender, ...rest] = msg.content.split(": ");
-                const bodyHtml = rest.join(": ");
-                const isOnline = userStatuses[sender] === "online";
-
-                return (
-                  <div key={i} className="message">
-                    <strong>
-                      <span
-                        className="status-circle"
-                        style={{
-                          backgroundColor: isOnline ? "limegreen" : "gray",
-                        }}
-                      />
-                      {sender}:
-                    </strong>{" "}
-                    <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
-                  </div>
-                );
-              }
-
-              // file messages
-              if (msg.type === "file") {
-                const isOnline = userStatuses[msg.sender] === "online";
-                return (
-                  <div key={i} className="message">
-                    <strong>
-                      <span
-                        className="status-circle"
-                        style={{
-                          backgroundColor: isOnline ? "limegreen" : "gray",
-                        }}
-                      />
-                      {msg.sender}:
-                    </strong>{" "}
-                    <button
-                      className="file-link"
-                      onClick={() =>
-                        decryptAndDownloadFile(
-                          msg.fileUrl,
-                          msg.fileName,
-                          msg.iv,
-                          msg.authTag
-                        )
-                      }
-                    >
-                      {msg.fileName}{" "}
-                      {currentRoom === "general" ? "(encrypted)" : ""}
-                    </button>
-                  </div>
-                );
-              }
-
-              return null;
-            })}
-
-            {/* typing notification */}
-            {typingUser && (
-              <div className="typing-indicator">
-                <span>{typingUser} is typing</span>
-                <span className="typing-dots">
-                  <span>.</span>
-                  <span>.</span>
-                  <span>.</span>
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="input">
-            <span className="prompt">$ </span>
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-                handleTyping(); // Notify server that user is typing
-              }}
-              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type a message..."
-            />
-            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-              🤫
-            </button>
-            <input
-              type="file"
-              style={{ display: "none" }}
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-            />
-            <button onClick={() => fileInputRef.current.click()}>📁</button>
-            {showEmojiPicker && (
-              <div className="emoji-picker">
-                <EmojiPicker
-                  onEmojiClick={(emojiObject) => {
-                    setMessage((prev) => prev + emojiObject.emoji);
-                    setShowEmojiPicker(false);
-                  }}
-                />
-              </div>
-            )}
-            {/*
+        <div className="input">
+          <span className="prompt">$ </span>
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              handleTyping(); // Notify server that user is typing
+            }}
+            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+            placeholder="Type a message..."
+          />
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+            🤫
+          </button>
+          <input
+            type="file"
+            style={{ display: "none" }}
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+          />
+          <button onClick={() => fileInputRef.current.click()}>📁</button>
+          {showEmojiPicker && (
+            <div className="emoji-picker">
+              <EmojiPicker
+                onEmojiClick={(emojiObject) => {
+                  setMessage((prev) => prev + emojiObject.emoji);
+                  setShowEmojiPicker(false);
+                }}
+              />
+            </div>
+          )}
+          {/*
 <div className="user-list">
   <h4>Online</h4>
   {allUsers
@@ -867,11 +873,10 @@ function App() {
     ))}
 </div>
 */}
-            */
-          </div>
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
+    )}
+  </div>
+);
+
 export default App;
