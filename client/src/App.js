@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
-import { broadcastTyping, broadcastOnlineStatus } from "./client/indicators";
+import { broadcastTyping, broadcastOnlineStatus } from "./indicators";
 
 // Encryption utilities (only used for "general" room)
 const deriveRoomKey = async (roomName) => {
