@@ -620,189 +620,189 @@ function App() {
   /* const isImage = (fileName) => {
     const ext = fileName.split(".").pop().toLowerCase();
     return ["jpg", "jpeg", "png", "gif"].includes(ext);
-  */
-}
+  
+}*/
 
-return (
-  <div className="terminal">
-    <div className="header">securechat@localhost:~$</div>
-    {showPopup && <div className={`popup ${popupType}`}>{popupMessage}</div>}
-    {!loggedIn ? (
-      <div className="login">
-        <div className="prompt">
-          username:{" "}
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </div>
-        <div className="prompt">
-          password:{" "}
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <div className="commands">
-          <span className="command" onClick={register}>
-            register
-          </span>
-          <span className="command" onClick={login}>
-            login
-          </span>
-        </div>
-      </div>
-    ) : (
-      <div className="chat">
-        <div className="room-controls">
-          <span>Current room: {currentRoom}</span>
-          <select value={currentRoom} onChange={handleRoomChange}>
-            {rooms.map((room) => (
-              <option key={room.name} value={room.name}>
-                {room.name} {room.isPublic ? "(public)" : "(private)"}
-              </option>
-            ))}
-          </select>
-          <button onClick={logout}>Logout</button>
-        </div>
-        {showPasswordInput && (
-          <div className="password-prompt">
+  return (
+    <div className="terminal">
+      <div className="header">securechat@localhost:~$</div>
+      {showPopup && <div className={`popup ${popupType}`}>{popupMessage}</div>}
+      {!loggedIn ? (
+        <div className="login">
+          <div className="prompt">
+            username:{" "}
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div className="prompt">
+            password:{" "}
             <input
               type="password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder={`Password for ${selectedRoom}`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
             />
-            <button onClick={handleJoinPrivateRoom}>Join</button>
           </div>
-        )}
-        <div className="messages">
-          {messages.map((msg, i) => {
-            // text messages
-            if (msg.type === "text") {
-              // split “sender: HTML” into sender + body
-              const [sender, ...rest] = msg.content.split(": ");
-              const bodyHtml = rest.join(": ");
-              const isOnline = userStatuses[sender] === "online";
-
-              return (
-                <div key={i} className="message">
-                  <strong>
-                    <span
-                      className="status-circle"
-                      style={{
-                        backgroundColor: isOnline ? "limegreen" : "gray",
-                      }}
-                    />
-                    {sender}:
-                  </strong>{" "}
-                  <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
-                </div>
-              );
-            }
-
-            // file messages
-            if (msg.type === "file") {
-              const isOnline = userStatuses[msg.sender] === "online";
-              return (
-                <div key={i} className="message">
-                  <strong>
-                    <span
-                      className="status-circle"
-                      style={{
-                        backgroundColor: isOnline ? "limegreen" : "gray",
-                      }}
-                    />
-                    {msg.sender}:
-                  </strong>{" "}
-                  <button
-                    className="file-link"
-                    onClick={() =>
-                      decryptAndDownloadFile(
-                        msg.fileUrl,
-                        msg.fileName,
-                        msg.iv,
-                        msg.authTag
-                      )
-                    }
-                  >
-                    {msg.fileName}{" "}
-                    {currentRoom === "general" ? "(encrypted)" : ""}
-                  </button>
-                </div>
-              );
-            }
-
-            return null;
-          })}
-
-          {/* typing notification */}
-          {typingUser && (
-            <div className="typing-indicator">
-              <span>{typingUser} is typing</span>
-              <span className="typing-dots">
-                <span>.</span>
-                <span>.</span>
-                <span>.</span>
-              </span>
-            </div>
-          )}
+          <div className="commands">
+            <span className="command" onClick={register}>
+              register
+            </span>
+            <span className="command" onClick={login}>
+              login
+            </span>
+          </div>
         </div>
-
-        <div className="input">
-          <span className="prompt">$ </span>
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              handleTyping(); // Notify server that user is typing
-            }}
-            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-            placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
-          />
-          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-            🤫
-          </button>
-          <input
-            type="file"
-            style={{ display: "none" }}
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-          />
-          <button onClick={() => fileInputRef.current.click()}>📁</button>
-
-          {showEmojiPicker && (
-            <div className="emoji-picker">
-              <EmojiPicker
-                onEmojiClick={(emojiObject) => {
-                  setMessage((prev) => prev + emojiObject.emoji);
-                  setShowEmojiPicker(false);
-                }}
+      ) : (
+        <div className="chat">
+          <div className="room-controls">
+            <span>Current room: {currentRoom}</span>
+            <select value={currentRoom} onChange={handleRoomChange}>
+              {rooms.map((room) => (
+                <option key={room.name} value={room.name}>
+                  {room.name} {room.isPublic ? "(public)" : "(private)"}
+                </option>
+              ))}
+            </select>
+            <button onClick={logout}>Logout</button>
+          </div>
+          {showPasswordInput && (
+            <div className="password-prompt">
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder={`Password for ${selectedRoom}`}
               />
+              <button onClick={handleJoinPrivateRoom}>Join</button>
             </div>
           )}
+          <div className="messages">
+            {messages.map((msg, i) => {
+              // text messages
+              if (msg.type === "text") {
+                // split “sender: HTML” into sender + body
+                const [sender, ...rest] = msg.content.split(": ");
+                const bodyHtml = rest.join(": ");
+                const isOnline = userStatuses[sender] === "online";
 
-          <div className="user-list">
-            <h4>Online Users</h4>
-            {allUsers.map((user) => (
-              <div key={user} className="user-entry">
-                <span
-                  className="status-circle"
-                  style={{
-                    backgroundColor:
-                      userStatuses[user] === "online" ? "limegreen" : "gray",
+                return (
+                  <div key={i} className="message">
+                    <strong>
+                      <span
+                        className="status-circle"
+                        style={{
+                          backgroundColor: isOnline ? "limegreen" : "gray",
+                        }}
+                      />
+                      {sender}:
+                    </strong>{" "}
+                    <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                  </div>
+                );
+              }
+
+              // file messages
+              if (msg.type === "file") {
+                const isOnline = userStatuses[msg.sender] === "online";
+                return (
+                  <div key={i} className="message">
+                    <strong>
+                      <span
+                        className="status-circle"
+                        style={{
+                          backgroundColor: isOnline ? "limegreen" : "gray",
+                        }}
+                      />
+                      {msg.sender}:
+                    </strong>{" "}
+                    <button
+                      className="file-link"
+                      onClick={() =>
+                        decryptAndDownloadFile(
+                          msg.fileUrl,
+                          msg.fileName,
+                          msg.iv,
+                          msg.authTag
+                        )
+                      }
+                    >
+                      {msg.fileName}{" "}
+                      {currentRoom === "general" ? "(encrypted)" : ""}
+                    </button>
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+
+            {/* typing notification */}
+            {typingUser && (
+              <div className="typing-indicator">
+                <span>{typingUser} is typing</span>
+                <span className="typing-dots">
+                  <span>.</span>
+                  <span>.</span>
+                  <span>.</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="input">
+            <span className="prompt">$ </span>
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                handleTyping(); // Notify server that user is typing
+              }}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
+            />
+            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+              🤫
+            </button>
+            <input
+              type="file"
+              style={{ display: "none" }}
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+            />
+            <button onClick={() => fileInputRef.current.click()}>📁</button>
+
+            {showEmojiPicker && (
+              <div className="emoji-picker">
+                <EmojiPicker
+                  onEmojiClick={(emojiObject) => {
+                    setMessage((prev) => prev + emojiObject.emoji);
+                    setShowEmojiPicker(false);
                   }}
                 />
-                {user}
               </div>
-            ))}
+            )}
+
+            <div className="user-list">
+              <h4>Online Users</h4>
+              {allUsers.map((user) => (
+                <div key={user} className="user-entry">
+                  <span
+                    className="status-circle"
+                    style={{
+                      backgroundColor:
+                        userStatuses[user] === "online" ? "limegreen" : "gray",
+                    }}
+                  />
+                  {user}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    )}
-  </div>
-);
-
+      )}
+    </div>
+  );
+}
 export default App;
