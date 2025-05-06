@@ -785,19 +785,30 @@ function App() {
             )}
 
             <div className="user-list">
-              <h4>Online Users</h4>
-              {allUsers.map((user) => (
-                <div key={user} className="user-entry">
-                  <span
-                    className="status-circle"
-                    style={{
-                      backgroundColor:
-                        userStatuses[user] === "online" ? "limegreen" : "gray",
-                    }}
-                  />
-                  {user}
-                </div>
-              ))}
+              <h4>🟢 Online</h4>
+              {allUsers
+                .filter((u) => userStatuses[u] === "online")
+                .map((user) => (
+                  <div key={user} className="user-entry">
+                    <span
+                      className="status-circle"
+                      style={{ backgroundColor: "limegreen" }}
+                    />
+                    {user}
+                  </div>
+                ))}
+              <h4 style={{ marginTop: "10px" }}>⚪ Offline</h4>
+              {allUsers
+                .filter((u) => userStatuses[u] !== "online")
+                .map((user) => (
+                  <div key={user} className="user-entry">
+                    <span
+                      className="status-circle"
+                      style={{ backgroundColor: "gray" }}
+                    />
+                    {user}
+                  </div>
+                ))}
             </div>
           </div>
         </div>
