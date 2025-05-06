@@ -169,6 +169,8 @@ function App() {
             } else {
               await processTextMessage(sender, content, currentRoom);
             }
+          } else if (type === "user_list") {
+            setAllUsers(data.users);
           } else if (type === "file") {
             console.log("Received file WebSocket message:", data);
             console.log("IV:", data.iv, "AuthTag:", data.authTag); // more debbing
@@ -676,7 +678,7 @@ function App() {
           )}
           <div className="messages">
             {messages.map((msg, i) => {
-              // ▷ text messages
+              // text messages
               if (msg.type === "text") {
                 // split “sender: HTML” into sender + body
                 const [sender, ...rest] = msg.content.split(": ");
@@ -699,7 +701,7 @@ function App() {
                 );
               }
 
-              // ▷ file messages
+              // file messages
               if (msg.type === "file") {
                 const isOnline = userStatuses[msg.sender] === "online";
                 return (
@@ -759,7 +761,6 @@ function App() {
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
             />
-
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
               🤫
             </button>
@@ -770,16 +771,37 @@ function App() {
               onChange={handleFileSelect}
             />
             <button onClick={() => fileInputRef.current.click()}>📁</button>
-            {showEmojiPicker && (
-              <div className="emoji-picker">
-                <EmojiPicker
-                  onEmojiClick={(emojiObject) => {
-                    setMessage((prev) => prev + emojiObject.emoji);
-                    setShowEmojiPicker(false);
-                  }}
-                />
+
+            <>
+              {showEmojiPicker && (
+                <div className="emoji-picker">
+                  <EmojiPicker
+                    onEmojiClick={(emojiObject) => {
+                      setMessage((prev) => prev + emojiObject.emoji);
+                      setShowEmojiPicker(false);
+                    }}
+                  />
+                </div>
+              )}
+
+              <div className="user-list">
+                <h4>Online Users</h4>
+                {allUsers.map((user) => (
+                  <div key={user} className="user-entry">
+                    <span
+                      className="status-circle"
+                      style={{
+                        backgroundColor:
+                          userStatuses[user] === "online"
+                            ? "limegreen"
+                            : "gray",
+                      }}
+                    />
+                    {user}
+                  </div>
+                ))}
               </div>
-            )}
+            </>
           </div>
         </div>
       )}
