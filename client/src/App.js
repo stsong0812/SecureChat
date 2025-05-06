@@ -727,6 +727,32 @@ function App() {
           )}
           <div className="messages">
             {messages.map((msg, i) => {
+              if (msg.type === "system") {
+                return (
+                  <div
+                    key={i}
+                    className="message"
+                    style={{ fontFamily: "Fira Mono, monospace" }}
+                  >
+                    <div style={{ color: "#00ff00", marginBottom: "4px" }}>
+                      {username}@localhost:~$ {msg.command}
+                    </div>
+                    <div>
+                      {Array.isArray(msg.output) ? (
+                        msg.output.map((line, index) => (
+                          <div
+                            key={index}
+                            dangerouslySetInnerHTML={{ __html: line }}
+                          />
+                        ))
+                      ) : (
+                        <div dangerouslySetInnerHTML={{ __html: msg.output }} />
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
               // text messages
               if (msg.type === "text") {
                 // split “sender: HTML” into sender + body
