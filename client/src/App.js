@@ -99,6 +99,7 @@ function App() {
         console.log("WebSocket connected");
         setIsConnected(true); // Set connection status
       };
+      broadcastOnlineStatus(websocket, username, "online"); // broadcasting online
       websocket.onerror = (error) => {
         console.error("WebSocket error:", error);
         setIsConnected(false);
@@ -108,6 +109,7 @@ function App() {
         setIsConnected(false);
         setLoggedIn(false);
       };
+      broadcastOnlineStatus(websocket, username, "offline");
       websocket.onmessage = async (e) => {
         try {
           console.log("Raw WebSocket message received:", e.data);
@@ -727,10 +729,13 @@ function App() {
             <input
               type="text"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                broadcastTyping(ws, username, currentRoom); // ✅ use it here
+              }}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
             />
+
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
               🤫
             </button>
