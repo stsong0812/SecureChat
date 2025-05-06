@@ -352,24 +352,7 @@ function App() {
           "/create roomName [public|private] [password] → create a chat room",
           "/users → list all users with status",
         ];
-        helpText.forEach((line) => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              type: "system",
-              command: "help",
-              output: [
-                "*bold* → bold",
-                "_italic_ → italic",
-                "[text](url) → clickable link",
-                "/create roomName [public|private] [password] → create a chat room",
-                "/users → list all users with status",
-              ],
-            },
-          ]);
-          setMessage("");
-          return;
-        });
+
         if (message.trim() === "/users") {
           const userLines = allUsers.map((user) => {
             const isOnline = userStatuses[user] === "online";
