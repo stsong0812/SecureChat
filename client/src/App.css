@@ -7,6 +7,7 @@ body {
 }
 
 .terminal {
+  position: relative;
   max-width: 800px;
   margin: 20px auto;
   padding: 15px;
