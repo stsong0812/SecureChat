@@ -247,6 +247,10 @@ wss.on("connection", (socket) => {
     let data;
     try {
       data = JSON.parse(message.toString());
+
+      if (socket.username && clients.has(socket.username)) {
+        clients.get(socket.username).lastActive = Date.now();
+      }
     } catch (e) {
       socket.send(
         JSON.stringify({ type: "error", message: "Invalid message format" })
@@ -293,7 +297,11 @@ wss.on("connection", (socket) => {
       if (user && bcrypt.compareSync(password, user.password)) {
         socket.authenticated = true;
         socket.username = username;
-        clients.set(username, socket);
+        clients.set(username, {
+          socket,
+          room: socket.room,
+          lastActive: Date.now(),
+        });
 
         broadcastToAll({
           type: "user_status",
@@ -655,6 +663,21 @@ function broadcastToAll(message) {
     }
   });
 }
+// Periodic idle timeout check (5 minutes = 300000 ms)
+setInterval(() => {
+  const now = Date.now();
+  for (const [username, clientData] of clients.entries()) {
+    if (now - clientData.lastActive > 5 * 60 * 1000) {
+      console.log(`User ${username} is now idle/offline due to inactivity`);
+      clients.delete(username);
+      broadcastToAll({
+        type: "user_status",
+        username,
+        status: "offline",
+      });
+    }
+  }
+}, 60 * 1000); // Run every minute
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
