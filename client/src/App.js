@@ -85,6 +85,7 @@ function App() {
   const fileInputRef = useRef(null);
   const [typingUser, setTypingUser] = useState(null);
   const [userStatuses, setUserStatuses] = useState({});
+  const [allUsers, setAllUsers] = useState([]); // List of all registered usernames
 
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
@@ -148,6 +149,7 @@ function App() {
             } else if (message === "Logged in successfully") {
               setLoggedIn(true);
               websocket.send(JSON.stringify({ type: "get_rooms" }));
+              websocket.send(JSON.stringify({ type: "get_users" }));
               setCurrentRoom("general");
             }
           } else if (type === "error") {
