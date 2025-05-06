@@ -145,16 +145,16 @@ function App() {
                   await processTextMessage(msg.sender, msg.content, roomName);
                 }
               }
-            } else if (type === "user_status") {
-              setUserStatuses((prev) => ({
-                ...prev,
-                [data.username]: data.status,
-              }));
             } else if (message === "Logged in successfully") {
               setLoggedIn(true);
               websocket.send(JSON.stringify({ type: "get_rooms" }));
               setCurrentRoom("general");
             }
+          } else if (type === "user_status") {
+            setUserStatuses((prev) => ({
+              ...prev,
+              [data.username]: data.status,
+            }));
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
