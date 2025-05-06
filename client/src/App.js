@@ -675,11 +675,12 @@ function App() {
           )}
           <div className="messages">
             {messages.map((msg, i) => {
+              // ▷ text messages
               if (msg.type === "text") {
-                // split sender off the HTML payload
-                const match = msg.content.match(/^([^:]+):\s*(.*)$/);
-                const sender = match?.[1] || "unknown";
-                const body = match?.[2] || msg.content;
+                // split “sender: HTML” into sender + body
+                const [sender, ...rest] = msg.content.split(": ");
+                const bodyHtml = rest.join(": ");
+                const isOnline = userStatuses[sender] === "online";
 
                 return (
                   <div key={i} className="message">
@@ -687,29 +688,26 @@ function App() {
                       <span
                         className="status-circle"
                         style={{
-                          backgroundColor:
-                            userStatuses[sender] === "online"
-                              ? "limegreen"
-                              : "gray",
+                          backgroundColor: isOnline ? "limegreen" : "gray",
                         }}
                       />
                       {sender}:
                     </strong>{" "}
-                    <span dangerouslySetInnerHTML={{ __html: body }} />
+                    <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
                   </div>
                 );
-              } else if (msg.type === "file") {
-                // show same status + sender for file links
+              }
+
+              // ▷ file messages
+              if (msg.type === "file") {
+                const isOnline = userStatuses[msg.sender] === "online";
                 return (
                   <div key={i} className="message">
                     <strong>
                       <span
                         className="status-circle"
                         style={{
-                          backgroundColor:
-                            userStatuses[msg.sender] === "online"
-                              ? "limegreen"
-                              : "gray",
+                          backgroundColor: isOnline ? "limegreen" : "gray",
                         }}
                       />
                       {msg.sender}:
@@ -731,8 +729,11 @@ function App() {
                   </div>
                 );
               }
+
               return null;
             })}
+
+            {/* typing notification */}
             {typingUser && (
               <div className="typing-indicator">
                 <span>{typingUser} is typing</span>
