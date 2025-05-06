@@ -344,6 +344,39 @@ function App() {
       return;
     }
     if (message.trim()) {
+      if (message.trim() === "help") {
+        const helpText = [
+          "*bold* → bold",
+          "_italic_ → italic",
+          "[text](url) → clickable link",
+          "/create roomName [public|private] [password] → create a chat room",
+          "/users → list all users with status",
+        ];
+        helpText.forEach((line) => {
+          setMessages((prev) => [
+            ...prev,
+            { type: "text", content: `system: ${line}` },
+          ]);
+        });
+        setMessage("");
+        return;
+      }
+      if (message.trim() === "/users") {
+        allUsers.forEach((user) => {
+          const isOnline = userStatuses[user] === "online";
+          const dot = `<span style="color: ${
+            isOnline ? "limegreen" : "gray"
+          };">●</span>`;
+          const line = `${dot} ${user}`;
+          setMessages((prev) => [
+            ...prev,
+            { type: "text", content: `system: ${line}` },
+          ]);
+        });
+        setMessage("");
+        return;
+      }
+
       if (message.startsWith("/create ")) {
         const parts = message.split(" ");
         if (parts.length < 2) {
@@ -760,7 +793,7 @@ function App() {
                 handleTyping(); // Notify server that user is typing
               }}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
+              placeholder="Type a message..."
             />
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
               🤫
