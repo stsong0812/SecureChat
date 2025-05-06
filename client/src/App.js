@@ -654,8 +654,7 @@ function App() {
               if (msg.type === "text") {
                 return (
                   <div key={i} className="message">
-                    {" "}
-                    // online offline status
+                    {/* online offline status */}
                     {(() => {
                       const sender = msg.content?.split(":")[0];
                       const status = userStatuses[sender];
