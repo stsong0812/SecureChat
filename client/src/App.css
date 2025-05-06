@@ -207,8 +207,8 @@ body {
 }
 .status-circle {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 1000px;
+  height: 1000px;
   border-radius: 50%;
   margin-right: 6px;
   vertical-align: middle;
