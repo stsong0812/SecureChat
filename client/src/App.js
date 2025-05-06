@@ -750,32 +750,39 @@ function App() {
             )}
           </div>
 
-          <div className="chat-layout">
-            <div className="chat-main">
-              <div className="input">
-                <span className="prompt">$ </span>
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => {
-                    setMessage(e.target.value);
-                    handleTyping(); // Notify server that user is typing
+          <div className="input">
+            <span className="prompt">$ </span>
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                handleTyping(); // Notify server that user is typing
+              }}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
+            />
+            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+              🤫
+            </button>
+            <input
+              type="file"
+              style={{ display: "none" }}
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+            />
+            <button onClick={() => fileInputRef.current.click()}>📁</button>
+
+            {showEmojiPicker && (
+              <div className="emoji-picker">
+                <EmojiPicker
+                  onEmojiClick={(emojiObject) => {
+                    setMessage((prev) => prev + emojiObject.emoji);
+                    setShowEmojiPicker(false);
                   }}
-                  onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                  placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
                 />
-                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-                  🤫
-                </button>
-                <input
-                  type="file"
-                  style={{ display: "none" }}
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                />
-                <button onClick={() => fileInputRef.current.click()}>📁</button>
               </div>
-            </div>
+            )}
 
             <div className="user-list">
               <h4>Online Users</h4>
