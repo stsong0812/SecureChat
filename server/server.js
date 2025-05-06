@@ -355,14 +355,24 @@ wss.on("connection", (socket) => {
       }
     } else if (type === "get_rooms") {
       if (socket.authenticated) {
-        const roomList = db.prepare("SELECT name, isPublic FROM rooms").all();
-        socket.send(JSON.stringify({ type: "room_list", rooms: roomList }));
-      } else {
         socket.send(
           JSON.stringify({ type: "error", message: "Please log in first" })
         );
+        return;
       }
-    } else if (type === "join") {
+      const rooms = db.prepare("SELECT name, isPublic FROM rooms").all();
+      socket.send(JSON.stringify({ type: "room_list", rooms }));
+    } else if (type === "get_users") {
+      if (!socket.authenticated) {
+        socket.send(
+          JSON.stringify({ type: "error", message: "Please log in first" })
+        );
+        return;
+      }
+      const rows = db.prepare("SELECT username FROM users").all();
+      const users = rows.map((r) => r.username);
+      socket.send(JSON.stringify({ type: "user_list", users }));
+    } else if (type === "join_room") {
       if (!socket.authenticated) {
         socket.send(
           JSON.stringify({ type: "error", message: "Please log in first" })
