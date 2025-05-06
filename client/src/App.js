@@ -211,25 +211,24 @@ function App() {
       setWs(websocket);
       return () => websocket.close();
     };
-    // 🟢 Activity tracking useEffect for idle timeout pings
-    useEffect(() => {
-      const handleActivity = () => {
-        if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
-          ws.send(JSON.stringify({ type: "ping" }));
-        }
-      };
-
-      const events = ["mousemove", "keydown", "click"];
-      events.forEach((e) => window.addEventListener(e, handleActivity));
-
-      return () => {
-        events.forEach((e) => window.removeEventListener(e, handleActivity));
-      };
-    }, [ws, loggedIn]);
 
     initializeKeysAndWebSocket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    const handleActivity = () => {
+      if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      }
+    };
+
+    const events = ["mousemove", "keydown", "click"];
+    events.forEach((e) => window.addEventListener(e, handleActivity));
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, handleActivity));
+    };
+  }, [ws, loggedIn]);
   const decryptMessage = async (encrypted, key) => {
     try {
       const decoder = new TextDecoder();
