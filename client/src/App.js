@@ -805,7 +805,6 @@ function App() {
               onChange={handleFileSelect}
             />
             <button onClick={() => fileInputRef.current.click()}>📁</button>
-
             {showEmojiPicker && (
               <div className="emoji-picker">
                 <EmojiPicker
@@ -816,33 +815,35 @@ function App() {
                 />
               </div>
             )}
-
-            <div className="user-list">
-              <h4>Online</h4>
-              {allUsers
-                .filter((u) => userStatuses[u] === "online")
-                .map((user) => (
-                  <div key={user} className="user-entry">
-                    <span
-                      className="status-circle"
-                      style={{ backgroundColor: "limegreen" }}
-                    />
-                    {user}
-                  </div>
-                ))}
-              <h4 style={{ marginTop: "10px" }}>Offline</h4>
-              {allUsers
-                .filter((u) => userStatuses[u] !== "online")
-                .map((user) => (
-                  <div key={user} className="user-entry">
-                    <span
-                      className="status-circle"
-                      style={{ backgroundColor: "gray" }}
-                    />
-                    {user}
-                  </div>
-                ))}
-            </div>
+            {/*
+<div className="user-list">
+  <h4>Online</h4>
+  {allUsers
+    .filter((u) => userStatuses[u] === "online")
+    .map((user) => (
+      <div key={user} className="user-entry">
+        <span
+          className="status-circle"
+          style={{ backgroundColor: "limegreen" }}
+        />
+        {user}
+      </div>
+    ))}
+  <h4 style={{ marginTop: "10px" }}>Offline</h4>
+  {allUsers
+    .filter((u) => userStatuses[u] !== "online")
+    .map((user) => (
+      <div key={user} className="user-entry">
+        <span
+          className="status-circle"
+          style={{ backgroundColor: "gray" }}
+        />
+        {user}
+      </div>
+    ))}
+</div>
+*/}
+            */
           </div>
         </div>
       )}
