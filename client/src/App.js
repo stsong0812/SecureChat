@@ -84,6 +84,7 @@ function App() {
   const pendingMessagesRef = useRef({}); // Map of roomName to pending messages
   const fileInputRef = useRef(null);
   const [typingUser, setTypingUser] = useState(null);
+  const [userStatuses, setUserStatuses] = useState({});
 
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
@@ -187,6 +188,11 @@ function App() {
               const newRooms = [...prevRooms, room];
               return newRooms;
             });
+          } else if (type === "user_status") {
+            setUserStatuses((prev) => ({
+              ...prev,
+              [sender]: data.status, // "online" or "offline"
+            }));
           } else if (type === "typing") {
             if (sender !== username) setTypingUser(sender);
           } else if (type === "stop_typing") {
@@ -205,6 +211,21 @@ function App() {
       setWs(websocket);
       return () => websocket.close();
     };
+    // 🟢 Activity tracking useEffect for idle timeout pings
+    useEffect(() => {
+      const handleActivity = () => {
+        if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      };
+
+      const events = ["mousemove", "keydown", "click"];
+      events.forEach((e) => window.addEventListener(e, handleActivity));
+
+      return () => {
+        events.forEach((e) => window.removeEventListener(e, handleActivity));
+      };
+    }, [ws, loggedIn]);
 
     initializeKeysAndWebSocket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -711,6 +732,16 @@ function App() {
               }
               return null;
             })}
+            {typingUser && (
+              <div className="typing-indicator">
+                <span>{typingUser} is typing</span>
+                <span className="typing-dots">
+                  <span>.</span>
+                  <span>.</span>
+                  <span>.</span>
+                </span>
+              </div>
+            )}
           </div>
           <div className="input">
             <span className="prompt">$ </span>
