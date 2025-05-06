@@ -470,6 +470,9 @@ function App() {
         password: passwordInput,
       })
     );
+
+    setCurrentRoom(selectedRoom); //should fix broken rooms functionality
+
     setShowPasswordInput(false);
     setPasswordInput("");
   };
