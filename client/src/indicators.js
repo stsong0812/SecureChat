@@ -1,4 +1,4 @@
-export const broadcastTyping = (ws, username, room) => {
+/*export const broadcastTyping = (ws, username, room) => {
   ws.send(JSON.stringify({ type: "typing", username, room }));
 };
 
@@ -11,3 +11,4 @@ export const broadcastOnlineStatus = (ws, username, isOnline) => {
     })
   );
 };
+*/

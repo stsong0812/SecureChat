@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
-import { broadcastTyping, broadcastOnlineStatus } from "./indicators";
 
 // Encryption utilities (only used for "general" room)
 const deriveRoomKey = async (roomName) => {
@@ -84,7 +83,6 @@ function App() {
   const roomKeysRef = useRef({}); // Only used for "general"
   const pendingMessagesRef = useRef({}); // Map of roomName to pending messages
   const fileInputRef = useRef(null);
-  const [userStatuses, setUserStatuses] = useState({});
 
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
@@ -96,11 +94,9 @@ function App() {
       console.log("Connecting to WebSocket URL:", wsUrl); // Debug log
       const websocket = new WebSocket(wsUrl);
       websocket.onopen = () => {
-        broadcastOnlineStatus(websocket, username, true);
         console.log("WebSocket connected");
         setIsConnected(true); // Set connection status
       };
-      broadcastOnlineStatus(websocket, username, "online"); // broadcasting online
       websocket.onerror = (error) => {
         console.error("WebSocket error:", error);
         setIsConnected(false);
@@ -109,9 +105,7 @@ function App() {
         console.log("WebSocket connection closed");
         setIsConnected(false);
         setLoggedIn(false);
-        broadcastOnlineStatus(websocket, username, false);
       };
-      broadcastOnlineStatus(websocket, username, "offline");
       websocket.onmessage = async (e) => {
         try {
           console.log("Raw WebSocket message received:", e.data);
@@ -154,11 +148,6 @@ function App() {
               websocket.send(JSON.stringify({ type: "get_rooms" }));
               setCurrentRoom("general");
             }
-          } else if (type === "user_status") {
-            setUserStatuses((prev) => ({
-              ...prev,
-              [data.username]: data.status,
-            }));
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
@@ -472,17 +461,11 @@ function App() {
     const authTag = encryptedBytes.slice(-16); // last 16 bytes
     const ciphertext = encryptedBytes.slice(0, -16); // everything else
 
-    // Append authTag to the ciphertext
-    const fullEncrypted = new Uint8Array(ciphertext.length + authTag.length);
-    fullEncrypted.set(ciphertext, 0);
-    fullEncrypted.set(authTag, ciphertext.length);
-
-    // Then chunk fullEncrypted
     const chunks = [];
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, fullEncrypted.length);
-      chunks.push(new Uint8Array(fullEncrypted.slice(start, end)));
+      const end = Math.min(start + chunkSize, ciphertext.length);
+      chunks.push(new Uint8Array(ciphertext.slice(start, end)));
     }
 
     const ivHex = Array.from(iv)
@@ -565,12 +548,12 @@ function App() {
       if (authTag.length !== 16)
         throw new Error("Invalid AuthTag length. Expected 16 bytes.");
 
-      const fullData = new Uint8Array(encryptedBuffer); // AuthTag is already included
+      const fullData = new Uint8Array(
+        encryptedBuffer.byteLength + authTag.length
+      );
+      fullData.set(new Uint8Array(encryptedBuffer), 0);
+      fullData.set(authTag, encryptedBuffer.byteLength);
 
-      console.log("EncryptedBuffer size:", encryptedBuffer.byteLength);
-      console.log("AuthTag size:", authTag.length);
-      console.log("IV size:", iv.length);
-      console.log("FullData size:", fullData.length);
       const decrypted = await crypto.subtle.decrypt(
         { name: "AES-GCM", iv },
         key,
@@ -653,27 +636,11 @@ function App() {
             {messages.map((msg, i) => {
               if (msg.type === "text") {
                 return (
-                  <div key={i} className="message">
-                    {/* online offline status */}
-                    {(() => {
-                      const sender = msg.content?.split(":")[0];
-                      const status = userStatuses[sender];
-                      const emoji =
-                        status === "online"
-                          ? "🟢"
-                          : status === "offline"
-                          ? "🔴"
-                          : "⚪️";
-                      return (
-                        <>
-                          <span>{emoji} </span>
-                          <span
-                            dangerouslySetInnerHTML={{ __html: msg.content }}
-                          />
-                        </>
-                      );
-                    })()}
-                  </div>
+                  <div
+                    key={i}
+                    className="message"
+                    dangerouslySetInnerHTML={{ __html: msg.content }}
+                  />
                 );
               } else if (msg.type === "file") {
                 if (isImage(msg.fileName)) {
@@ -730,13 +697,10 @@ function App() {
             <input
               type="text"
               value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-                broadcastTyping(ws, username, currentRoom); // ✅ use it here
-              }}
+              onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              placeholder="Type a message (*bold*, _italic_, [link](url)) or /create roomName [public|private] [password]"
             />
-
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
               🤫
             </button>
