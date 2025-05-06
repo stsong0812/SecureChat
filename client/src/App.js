@@ -676,81 +676,60 @@ function App() {
           <div className="messages">
             {messages.map((msg, i) => {
               if (msg.type === "text") {
+                // split sender off the HTML payload
+                const match = msg.content.match(/^([^:]+):\s*(.*)$/);
+                const sender = match?.[1] || "unknown";
+                const body = match?.[2] || msg.content;
+
                 return (
-                  <div
-                    key={i}
-                    className="message"
-                    dangerouslySetInnerHTML={{ __html: msg.content }}
-                  />
+                  <div key={i} className="message">
+                    <strong>
+                      <span
+                        className="status-circle"
+                        style={{
+                          backgroundColor:
+                            userStatuses[sender] === "online"
+                              ? "limegreen"
+                              : "gray",
+                        }}
+                      />
+                      {sender}:
+                    </strong>{" "}
+                    <span dangerouslySetInnerHTML={{ __html: body }} />
+                  </div>
                 );
               } else if (msg.type === "file") {
-                if (isImage(msg.fileName)) {
-                  return (
-                    <div key={i} className="message">
-                      <div>
-                        <strong>
-                          <span
-                            className="status-circle"
-                            style={{
-                              backgroundColor:
-                                userStatuses[msg.sender] === "online"
-                                  ? "limegreen"
-                                  : "gray",
-                            }}
-                          />
-                          {msg.sender}
-                        </strong>
-                      </div>
-                      <button
-                        className="file-link"
-                        onClick={() =>
-                          decryptAndDownloadFile(
-                            msg.fileUrl,
-                            msg.fileName,
-                            msg.iv,
-                            msg.authTag
-                          )
-                        }
-                      >
-                        {msg.fileName}{" "}
-                        {currentRoom === "general" ? "(encrypted)" : ""}
-                      </button>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div key={i} className="message">
-                      <div>
-                        <strong>
-                          <span
-                            className="status-circle"
-                            style={{
-                              backgroundColor:
-                                userStatuses[msg.sender] === "online"
-                                  ? "limegreen"
-                                  : "gray",
-                            }}
-                          />
-                          {msg.sender}
-                        </strong>
-                      </div>
-                      <button
-                        className="file-link"
-                        onClick={() =>
-                          decryptAndDownloadFile(
-                            msg.fileUrl,
-                            msg.fileName,
-                            msg.iv,
-                            msg.authTag
-                          )
-                        }
-                      >
-                        {msg.fileName}{" "}
-                        {currentRoom === "general" ? "(encrypted)" : ""}
-                      </button>
-                    </div>
-                  );
-                }
+                // show same status + sender for file links
+                return (
+                  <div key={i} className="message">
+                    <strong>
+                      <span
+                        className="status-circle"
+                        style={{
+                          backgroundColor:
+                            userStatuses[msg.sender] === "online"
+                              ? "limegreen"
+                              : "gray",
+                        }}
+                      />
+                      {msg.sender}:
+                    </strong>{" "}
+                    <button
+                      className="file-link"
+                      onClick={() =>
+                        decryptAndDownloadFile(
+                          msg.fileUrl,
+                          msg.fileName,
+                          msg.iv,
+                          msg.authTag
+                        )
+                      }
+                    >
+                      {msg.fileName}{" "}
+                      {currentRoom === "general" ? "(encrypted)" : ""}
+                    </button>
+                  </div>
+                );
               }
               return null;
             })}
@@ -765,6 +744,7 @@ function App() {
               </div>
             )}
           </div>
+
           <div className="input">
             <span className="prompt">$ </span>
             <input
