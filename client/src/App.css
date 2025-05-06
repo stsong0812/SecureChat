@@ -233,4 +233,32 @@ body {
   height: 10px;
   border-radius: 50%;
   margin-right: 6px;
+  border: 1px solid #c9d1d9;
+}
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  font-style: italic;
+  color: #00ff00;
+}
+
+.typing-dots span {
+  animation: blink 1.4s infinite;
+  margin-left: 2px;
+  font-weight: bold;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0% { opacity: 0.2; }
+  20% { opacity: 1; }
+  100% { opacity: 0.2; }
 }
