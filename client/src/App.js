@@ -785,7 +785,7 @@ function App() {
             )}
 
             <div className="user-list">
-              <h4>🟢 Online</h4>
+              <h4>Online</h4>
               {allUsers
                 .filter((u) => userStatuses[u] === "online")
                 .map((user) => (
@@ -797,7 +797,7 @@ function App() {
                     {user}
                   </div>
                 ))}
-              <h4 style={{ marginTop: "10px" }}>⚪ Offline</h4>
+              <h4 style={{ marginTop: "10px" }}>Offline</h4>
               {allUsers
                 .filter((u) => userStatuses[u] !== "online")
                 .map((user) => (
