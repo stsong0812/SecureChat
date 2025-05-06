@@ -688,7 +688,18 @@ function App() {
                   return (
                     <div key={i} className="message">
                       <div>
-                        <strong>{msg.sender}</strong>:
+                        <strong>
+                          <span
+                            className="status-circle"
+                            style={{
+                              backgroundColor:
+                                userStatuses[msg.sender] === "online"
+                                  ? "limegreen"
+                                  : "gray",
+                            }}
+                          />
+                          {msg.sender}
+                        </strong>
                       </div>
                       <button
                         className="file-link"
@@ -710,7 +721,18 @@ function App() {
                   return (
                     <div key={i} className="message">
                       <div>
-                        <strong>{msg.sender}</strong>:
+                        <strong>
+                          <span
+                            className="status-circle"
+                            style={{
+                              backgroundColor:
+                                userStatuses[msg.sender] === "online"
+                                  ? "limegreen"
+                                  : "gray",
+                            }}
+                          />
+                          {msg.sender}
+                        </strong>
                       </div>
                       <button
                         className="file-link"
