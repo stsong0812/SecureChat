@@ -5,7 +5,7 @@ export const broadcastTyping = (ws, username, room) => {
 export const broadcastOnlineStatus = (ws, username, isOnline) => {
   ws.send(
     JSON.stringify({
-      type: "status_update",
+      type: "user_status", // name change
       username,
       status: isOnline ? "online" : "offline",
     })

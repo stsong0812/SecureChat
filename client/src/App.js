@@ -96,6 +96,7 @@ function App() {
       console.log("Connecting to WebSocket URL:", wsUrl); // Debug log
       const websocket = new WebSocket(wsUrl);
       websocket.onopen = () => {
+        broadcastOnlineStatus(websocket, username, true);
         console.log("WebSocket connected");
         setIsConnected(true); // Set connection status
       };
@@ -108,6 +109,7 @@ function App() {
         console.log("WebSocket connection closed");
         setIsConnected(false);
         setLoggedIn(false);
+        broadcastOnlineStatus(websocket, username, false);
       };
       broadcastOnlineStatus(websocket, username, "offline");
       websocket.onmessage = async (e) => {
