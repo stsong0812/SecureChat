@@ -772,36 +772,32 @@ function App() {
             />
             <button onClick={() => fileInputRef.current.click()}>📁</button>
 
-            <>
-              {showEmojiPicker && (
-                <div className="emoji-picker">
-                  <EmojiPicker
-                    onEmojiClick={(emojiObject) => {
-                      setMessage((prev) => prev + emojiObject.emoji);
-                      setShowEmojiPicker(false);
+            {showEmojiPicker && (
+              <div className="emoji-picker">
+                <EmojiPicker
+                  onEmojiClick={(emojiObject) => {
+                    setMessage((prev) => prev + emojiObject.emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="user-list">
+              <h4>Online Users</h4>
+              {allUsers.map((user) => (
+                <div key={user} className="user-entry">
+                  <span
+                    className="status-circle"
+                    style={{
+                      backgroundColor:
+                        userStatuses[user] === "online" ? "limegreen" : "gray",
                     }}
                   />
+                  {user}
                 </div>
-              )}
-
-              <div className="user-list">
-                <h4>Online Users</h4>
-                {allUsers.map((user) => (
-                  <div key={user} className="user-entry">
-                    <span
-                      className="status-circle"
-                      style={{
-                        backgroundColor:
-                          userStatuses[user] === "online"
-                            ? "limegreen"
-                            : "gray",
-                      }}
-                    />
-                    {user}
-                  </div>
-                ))}
-              </div>
-            </>
+              ))}
+            </div>
           </div>
         </div>
       )}
