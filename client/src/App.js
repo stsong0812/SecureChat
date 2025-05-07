@@ -185,6 +185,13 @@ function App() {
             }
           } else if (type === "user_list") {
             setAllUsers(data.users);
+            setUserStatuses((prev) => {
+              const merged = {};
+              for (const user of data.users) {
+                merged[user] = prev[user] || "offline"; // Keep current status or default to offline
+              }
+              return merged;
+            });
           } else if (type === "file") {
             console.log("Received file WebSocket message:", data);
             console.log("IV:", data.iv, "AuthTag:", data.authTag); // more debbing
@@ -478,19 +485,26 @@ function App() {
   };
 
   const typingTimeoutRef = useRef(null);
+  const hasSentTypingRef = useRef(false);
 
   const handleTyping = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
     const actualCurrentRoom = currentRoomRef.current;
 
-    ws.send(JSON.stringify({ type: "typing", room: actualCurrentRoom }));
+    // Only send typing once per typing session
+    if (!hasSentTypingRef.current) {
+      ws.send(JSON.stringify({ type: "typing", room: actualCurrentRoom }));
+      hasSentTypingRef.current = true;
+    }
 
+    // Reset the timeout to send stop_typing after 3s of inactivity
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
 
     typingTimeoutRef.current = setTimeout(() => {
       ws.send(JSON.stringify({ type: "stop_typing", room: actualCurrentRoom }));
+      hasSentTypingRef.current = false;
     }, 3000);
   };
 
