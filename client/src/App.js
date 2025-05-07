@@ -799,23 +799,23 @@ function App() {
                 return (
                   <div key={i} className="message">
                     {senderName ? (
-                      <strong>
-                        <span
-                          className="status-circle"
-                          style={{
-                            backgroundColor:
-                              userStatuses[senderName] === "online"
-                                ? "limegreen"
-                                : "gray",
-                          }}
-                        />
-                        {senderName}:
-                      </strong>
+                      <>
+                        <strong>
+                          <span
+                            className="status-circle"
+                            style={{
+                              backgroundColor:
+                                userStatuses[senderName] === "online"
+                                  ? "limegreen"
+                                  : "gray",
+                            }}
+                          />
+                          {senderName}:
+                        </strong>{" "}
+                        <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                      </>
                     ) : (
                       <span dangerouslySetInnerHTML={{ __html: msg.content }} />
-                    )}
-                    {senderName && (
-                      <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
                     )}
                   </div>
                 );
