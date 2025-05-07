@@ -382,6 +382,7 @@ function App() {
     }
 
     if (message.trim() === "/users") {
+      const terminalPrompt = getTerminalPrompt();
       const onlineUsers = allUsers.filter(
         (user) => userStatuses[user] === "online"
       );
@@ -389,15 +390,17 @@ function App() {
         (user) => userStatuses[user] !== "online"
       );
 
-      const terminalPrompt = getTerminalPrompt();
-
       const lines = [
         `${terminalPrompt} /users`,
         "===== Online =====",
-        ...onlineUsers.map((user) => `● ${user}`),
+        ...onlineUsers.map(
+          (user) => `<span style="color:limegreen">●</span> ${user}`
+        ),
         "",
         "===== Offline =====",
-        ...offlineUsers.map((user) => `○ ${user}`),
+        ...offlineUsers.map(
+          (user) => `<span style="color:gray">●</span> ${user}`
+        ),
       ];
 
       lines.forEach((line) => {
