@@ -394,33 +394,45 @@ function App() {
     }
 
     if (message.trim() === "/users") {
-      const users = allUsers || []; // fallback to empty list
+      const users = allUsers || [];
       const onlineUsers = users.filter(
         (user) => userStatuses[user] === "online"
       );
       const offlineUsers = users.filter(
         (user) => userStatuses[user] !== "online"
       );
-      console.log("All users:", allUsers);
-      console.log("Statuses:", userStatuses);
 
-      const outputLines = [
-        `${getTerminalPrompt()} /users`,
-        "===== Online =====",
-        ...onlineUsers.map(
-          (u) => `<span style="color: limegreen;">●</span> ${u}`
-        ),
-        "",
-        "===== Offline =====",
-        ...offlineUsers.map((u) => `<span style="color: gray;">○</span> ${u}`),
-      ];
-
-      outputLines.forEach((line) => {
-        setMessages((prev) => [
-          ...prev,
-          { type: "text", content: line, isHtml: true },
-        ]);
-      });
+      setMessages((prev) => [
+        ...prev,
+        { type: "text", content: `${getTerminalPrompt()} /users` },
+        { type: "text", content: "===== Online =====" },
+        ...onlineUsers.map((u) => ({
+          type: "element",
+          content: (
+            <div>
+              <span
+                className="status-circle"
+                style={{ backgroundColor: "limegreen" }}
+              />
+              {u}
+            </div>
+          ),
+        })),
+        { type: "text", content: "" },
+        { type: "text", content: "===== Offline =====" },
+        ...offlineUsers.map((u) => ({
+          type: "element",
+          content: (
+            <div>
+              <span
+                className="status-circle"
+                style={{ backgroundColor: "gray" }}
+              />
+              {u}
+            </div>
+          ),
+        })),
+      ]);
 
       setMessage("");
       return;
@@ -858,6 +870,14 @@ function App() {
                   </div>
                 );
               }
+              if (msg.type === "element") {
+                return (
+                  <div key={i} className="message">
+                    {msg.content}
+                  </div>
+                );
+              }
+
               return null;
             })}
 
