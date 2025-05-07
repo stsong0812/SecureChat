@@ -302,6 +302,7 @@ wss.on("connection", (socket) => {
           room: socket.room,
           lastActive: Date.now(),
         });
+        broadcastUserStatusUpdate();
 
         broadcastToAll({
           type: "user_status",
@@ -699,19 +700,32 @@ function broadcastToAll(message) {
     }
   });
 }
+function broadcastUserStatusUpdate() {
+  const users = Array.from(clients.keys());
+  broadcastToAll({
+    type: "user_list",
+    users,
+  });
+}
+
 // Periodic idle timeout check (5 minutes = 300000 ms)
 setInterval(() => {
   const now = Date.now();
+  const toRemove = [];
+
   for (const [username, clientData] of clients.entries()) {
     if (now - clientData.lastActive > 5 * 60 * 1000) {
       console.log(`User ${username} is now idle/offline due to inactivity`);
-      clients.delete(username);
-      broadcastToAll({
-        type: "user_status",
-        sender: username,
-        status: "offline",
-      });
+      toRemove.push(username);
     }
+  }
+
+  for (const username of toRemove) {
+    clients.delete(username);
+  }
+
+  if (toRemove.length > 0) {
+    broadcastUserStatusUpdate();
   }
 }, 60 * 1000); // Run every minute
 
