@@ -184,13 +184,17 @@ function App() {
               await processTextMessage(sender, content, actualCurrentRoom);
             }
           } else if (type === "user_list") {
-            const users = data.users || [];
+            const users = data.users || data; // support both formats
             setAllUsers(users);
-            setUserStatuses((prev) => {
-              const merged = {};
-              for (const user of users) {
-                merged[user] = prev[user] || "offline";
-              }
+
+            // Update statuses only if missing
+            setUserStatuses((prevStatuses) => {
+              const merged = { ...prevStatuses };
+              users.forEach((user) => {
+                if (!(user in merged)) {
+                  merged[user] = "offline";
+                }
+              });
               return merged;
             });
           } else if (type === "file") {
@@ -397,6 +401,8 @@ function App() {
       const offlineUsers = users.filter(
         (user) => userStatuses[user] !== "online"
       );
+      console.log("All users:", allUsers);
+      console.log("Statuses:", userStatuses);
 
       const outputLines = [
         `${getTerminalPrompt()} /users`,
