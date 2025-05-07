@@ -363,21 +363,19 @@ function App() {
       return;
     }
     if (message.trim() === "/help") {
-      const lines = [
-        `<span style="color:#00ff00">${username}@localhost:~$</span> help`,
-        "*bold* → bold",
-        "_italic_ → italic",
-        "[text](url) → clickable link",
-        "/create roomName [public|private] [password] → create a chat room",
-        "/users → list all users with status",
-      ];
+      const helpOutput = `
+        <b style="color:#00ff00">${username}@localhost:~$</b> help<br>
+        *bold* → bold<br>
+        _italic_ → italic<br>
+        [text](url) → clickable link<br>
+        /create roomName [public|private] [password] → create a chat room<br>
+        /users → list all users with status
+      `.trim();
 
-      lines.forEach((line) => {
-        setMessages((prev) => [
-          ...prev,
-          { type: "text", content: `system: ${line}` },
-        ]);
-      });
+      setMessages((prev) => [
+        ...prev,
+        { type: "text", content: helpOutput }, // no prefix
+      ]);
 
       setMessage("");
       return;
