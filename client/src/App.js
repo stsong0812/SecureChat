@@ -811,8 +811,12 @@ function App() {
                         />
                         {senderName}:
                       </strong>
-                    ) : null}
-                    <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                    ) : (
+                      <span dangerouslySetInnerHTML={{ __html: msg.content }} />
+                    )}
+                    {senderName && (
+                      <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                    )}
                   </div>
                 );
               }
