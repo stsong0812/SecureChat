@@ -418,8 +418,8 @@ function App() {
           password: roomPassword,
         })
       );
-      // Server should handle joining the room and sending confirmation.
-      // Client updates currentRoom upon receiving "Joined room:" status.
+      // Server should handle joining the room and sending confirmation
+      // Client updates currentRoom upon receiving "Joined room:" status
     } else {
       const actualCurrentRoom = currentRoomRef.current;
       console.log("Sending message:", message, "in room:", actualCurrentRoom);
@@ -746,26 +746,36 @@ function App() {
           <div className="messages">
             {messages.map((msg, i) => {
               if (msg.type === "text") {
-                const senderName = msg.content.substring(
-                  0,
-                  msg.content.indexOf(": ")
-                );
-                const bodyHtml = msg.content.substring(
-                  msg.content.indexOf(": ") + 2
-                );
-                const isOnline = userStatuses[senderName] === "online";
+                const hasPrefix = msg.content.includes(": ");
+                let senderName = null;
+                let bodyHtml = msg.content;
+
+                if (hasPrefix) {
+                  senderName = msg.content.substring(
+                    0,
+                    msg.content.indexOf(": ")
+                  );
+                  bodyHtml = msg.content.substring(
+                    msg.content.indexOf(": ") + 2
+                  );
+                }
 
                 return (
                   <div key={i} className="message">
-                    <strong>
-                      <span
-                        className="status-circle"
-                        style={{
-                          backgroundColor: isOnline ? "limegreen" : "gray",
-                        }}
-                      />
-                      {senderName}:
-                    </strong>{" "}
+                    {senderName ? (
+                      <strong>
+                        <span
+                          className="status-circle"
+                          style={{
+                            backgroundColor:
+                              userStatuses[senderName] === "online"
+                                ? "limegreen"
+                                : "gray",
+                          }}
+                        />
+                        {senderName}:
+                      </strong>
+                    ) : null}
                     <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
                   </div>
                 );
