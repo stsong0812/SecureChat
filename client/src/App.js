@@ -90,6 +90,9 @@ function App() {
 
   const currentRoomRef = useRef(currentRoom);
 
+  const getTerminalPrompt = () => {
+    return `<span style="color:#00ff00">${username}@localhost:~$</span>`;
+  };
   useEffect(() => {
     currentRoomRef.current = currentRoom;
   }, [currentRoom]);
@@ -364,7 +367,7 @@ function App() {
     }
     if (message.trim() === "/help") {
       const helpOutput = `
-        <b style="color:#00ff00">${username}@localhost:~$</b> help<br>
+        ${getTerminalPrompt()} help<br>
         *bold* → bold<br>
         _italic_ → italic<br>
         [text](url) → clickable link<br>
@@ -372,27 +375,35 @@ function App() {
         /users → list all users with status
       `.trim();
 
-      setMessages((prev) => [
-        ...prev,
-        { type: "text", content: helpOutput }, // no prefix
-      ]);
+      setMessages((prev) => [...prev, { type: "text", content: helpOutput }]);
 
       setMessage("");
       return;
     }
 
     if (message.trim() === "/users") {
-      allUsers.forEach((user) => {
-        const isOnline = userStatuses[user] === "online";
-        const dot = `<span style="color: ${
-          isOnline ? "limegreen" : "gray"
-        };">●</span>`;
-        const line = `${dot} ${user}`;
-        setMessages((prev) => [
-          ...prev,
-          { type: "text", content: `system: ${line}` },
-        ]);
+      const onlineUsers = allUsers.filter(
+        (user) => userStatuses[user] === "online"
+      );
+      const offlineUsers = allUsers.filter(
+        (user) => userStatuses[user] !== "online"
+      );
+
+      const terminalPrompt = getTerminalPrompt();
+
+      const lines = [
+        `${terminalPrompt} /users`,
+        "===== Online =====",
+        ...onlineUsers.map((user) => `● ${user}`),
+        "",
+        "===== Offline =====",
+        ...offlineUsers.map((user) => `○ ${user}`),
+      ];
+
+      lines.forEach((line) => {
+        setMessages((prev) => [...prev, { type: "text", content: line }]);
       });
+
       setMessage("");
       return;
     }
