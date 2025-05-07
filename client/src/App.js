@@ -87,6 +87,8 @@ function App() {
   const [typingUser, setTypingUser] = useState(null);
   const [userStatuses, setUserStatuses] = useState({});
   const [allUsers, setAllUsers] = useState([]); // List of all registered usernames
+  const idleTimerRef = useRef(null);
+  const lastActivityTimeRef = useRef(Date.now());
 
   const currentRoomRef = useRef(currentRoom);
 
@@ -247,17 +249,46 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const handleActivity = () => {
+    const handleUserActivity = () => {
+      lastActivityTimeRef.current = Date.now();
       if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
         ws.send(JSON.stringify({ type: "ping" }));
+        // If they were marked idle, mark them online again
+        ws.send(JSON.stringify({ type: "user_status", status: "online" }));
       }
     };
 
-    const events = ["mousemove", "keydown", "click"];
-    events.forEach((e) => window.addEventListener(e, handleActivity));
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Came back to tab
+        handleUserActivity();
+      }
+    };
+
+    const checkIdle = () => {
+      const now = Date.now();
+      const inactiveTime = now - lastActivityTimeRef.current;
+      if (inactiveTime > 3 * 60 * 1000) {
+        if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
+          ws.send(JSON.stringify({ type: "idle" }));
+        }
+      }
+    };
+
+    const activityEvents = ["mousemove", "keydown", "click"];
+    activityEvents.forEach((event) =>
+      window.addEventListener(event, handleUserActivity)
+    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    idleTimerRef.current = setInterval(checkIdle, 60 * 1000); // check every 1 min
 
     return () => {
-      events.forEach((e) => window.removeEventListener(e, handleActivity));
+      activityEvents.forEach((event) =>
+        window.removeEventListener(event, handleUserActivity)
+      );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(idleTimerRef.current);
     };
   }, [ws, loggedIn]);
 

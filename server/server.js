@@ -575,6 +575,32 @@ wss.on("connection", (socket) => {
         type: "stop_typing",
         sender: socket.username,
       });
+    } else if (type === "idle") {
+      if (clients.has(socket.username)) {
+        const clientData = clients.get(socket.username);
+        clientData.idle = true;
+        clientData.lastActive = Date.now(); // still track when they were marked idle
+        console.log(`User ${socket.username} marked as idle`);
+        broadcastToAll({
+          type: "user_status",
+          sender: socket.username,
+          status: "offline",
+        });
+      }
+    } else if (type === "user_status") {
+      if (data.status === "online" && clients.has(socket.username)) {
+        const clientData = clients.get(socket.username);
+        if (clientData.idle) {
+          clientData.idle = false;
+          clientData.lastActive = Date.now();
+          console.log(`User ${socket.username} is active again`);
+          broadcastToAll({
+            type: "user_status",
+            sender: socket.username,
+            status: "online",
+          });
+        }
+      }
     }
   });
 
