@@ -184,11 +184,12 @@ function App() {
               await processTextMessage(sender, content, actualCurrentRoom);
             }
           } else if (type === "user_list") {
-            setAllUsers(data.users);
+            const users = data.users || [];
+            setAllUsers(users);
             setUserStatuses((prev) => {
               const merged = {};
-              for (const user of data.users) {
-                merged[user] = prev[user] || "offline"; // Keep current status or default to offline
+              for (const user of users) {
+                merged[user] = prev[user] || "offline";
               }
               return merged;
             });
