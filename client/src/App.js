@@ -1,4 +1,3 @@
-// client/src/App.js
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
@@ -88,12 +87,6 @@ function App() {
   const [userStatuses, setUserStatuses] = useState({});
   const [allUsers, setAllUsers] = useState([]); // List of all registered usernames
 
-  const currentRoomRef = useRef(currentRoom);
-
-  useEffect(() => {
-    currentRoomRef.current = currentRoom;
-  }, [currentRoom]);
-
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
       const generalKey = await deriveRoomKey("general");
@@ -132,13 +125,12 @@ function App() {
           } = data;
 
           console.log("Parsed message:", data);
-          const actualCurrentRoom = currentRoomRef.current; // Use the ref for current room
 
           if (type === "status") {
             showPopupMessage(message, "success");
             if (message.startsWith("Joined room:")) {
               const roomName = message.split(":")[1].trim();
-              setCurrentRoom(roomName); // This will trigger the useEffect to update currentRoomRef
+              setCurrentRoom(roomName);
               setMessages([]);
               console.log(
                 `Switched to room '${roomName}', current keys:`,
@@ -158,24 +150,24 @@ function App() {
               setLoggedIn(true);
               websocket.send(JSON.stringify({ type: "get_rooms" }));
               websocket.send(JSON.stringify({ type: "get_users" }));
-              setCurrentRoom("general"); // This will update currentRoomRef via useEffect
+              setCurrentRoom("general");
             }
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
             if (
-              actualCurrentRoom === "general" &&
-              !roomKeysRef.current[actualCurrentRoom]
+              currentRoom === "general" &&
+              !roomKeysRef.current[currentRoom]
             ) {
               console.log(
-                `Key not ready for '${actualCurrentRoom}', queuing message`
+                `Key not ready for '${currentRoom}', queuing message`
               );
-              if (!pendingMessagesRef.current[actualCurrentRoom]) {
-                pendingMessagesRef.current[actualCurrentRoom] = [];
+              if (!pendingMessagesRef.current[currentRoom]) {
+                pendingMessagesRef.current[currentRoom] = [];
               }
-              pendingMessagesRef.current[actualCurrentRoom].push({ sender, content });
+              pendingMessagesRef.current[currentRoom].push({ sender, content });
             } else {
-              await processTextMessage(sender, content, actualCurrentRoom);
+              await processTextMessage(sender, content, currentRoom);
             }
           } else if (type === "user_list") {
             setAllUsers(data.users);
@@ -227,7 +219,6 @@ function App() {
     initializeKeysAndWebSocket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   useEffect(() => {
     const handleActivity = () => {
       if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
@@ -242,15 +233,9 @@ function App() {
       events.forEach((e) => window.removeEventListener(e, handleActivity));
     };
   }, [ws, loggedIn]);
-
   const decryptMessage = async (encrypted, key) => {
     try {
       const decoder = new TextDecoder();
-      // Ensure 'encrypted' is an object with 'iv' and 'data' properties
-      if (typeof encrypted !== 'object' || !encrypted.iv || !encrypted.data) {
-        console.error("Invalid encrypted object structure:", encrypted);
-        return "[Decryption Error: Invalid structure]";
-      }
       const iv = new Uint8Array(encrypted.iv);
       const data = new Uint8Array(encrypted.data);
 
@@ -268,28 +253,23 @@ function App() {
   };
 
   const processTextMessage = async (sender, content, room) => {
-    console.log("Processing text message for room:", room, { sender, content });
-    let decryptedText;
+    console.log("Processing text message:", { sender, content });
+    let decrypted;
     if (room === "general") {
-      if (!roomKeysRef.current[room]) {
-        console.error(`No decryption key available for room: ${room}`);
-        decryptedText = "[Decryption Error: Missing key]";
-      } else {
-        console.log(
-          "Using decryption key for",
-          room,
-          ":",
-          roomKeysRef.current[room]
-        );
-        decryptedText = await decryptMessage(content, roomKeysRef.current[room]);
-      }
+      console.log(
+        "Using decryption key for",
+        room,
+        ":",
+        roomKeysRef.current[room]
+      );
+      decrypted = await decryptMessage(content, roomKeysRef.current[room]);
     } else {
       console.log(`No encryption for '${room}', processing as plain text`);
-      decryptedText =
+      decrypted =
         typeof content === "string" ? content : "[Invalid message format]";
     }
-    console.log("Decrypted/Processed message text:", decryptedText);
-    const formatted = parseFormattedText(decryptedText);
+    console.log("Decrypted message:", decrypted);
+    const formatted = parseFormattedText(decrypted);
     setMessages((prev) => {
       const newMessages = [
         ...prev,
@@ -347,7 +327,14 @@ function App() {
 
   const logout = () => {
     if (ws && isConnected) {
-      ws.close(); // This will trigger onclose, setting isConnected and loggedIn to false
+      ws.close();
+      setLoggedIn(false);
+      setUsername("");
+      setPassword("");
+      setMessages([]);
+      setCurrentRoom("general");
+      setRooms([{ name: "general", isPublic: true }]);
+      roomKeysRef.current = { general: roomKeysRef.current.general }; // Retain only general key
     }
   };
 
@@ -401,53 +388,54 @@ function App() {
         }
         const roomName = parts[1];
         const visibility = parts[2] || "public";
-        const roomPassword = parts[3] || ""; // Renamed from password to avoid conflict
+        const password = parts[3] || "";
         const isPublic = visibility === "public";
         ws.send(
-          JSON.stringify({ type: "create_room", roomName, isPublic, password: roomPassword })
+          JSON.stringify({ type: "create_room", roomName, isPublic, password })
         );
-        // Server should handle joining the room and sending confirmation.
-        // Client updates currentRoom upon receiving "Joined room:" status.
+        setTimeout(() => {
+          ws.send(JSON.stringify({ type: "join", room: roomName }));
+          setCurrentRoom(roomName);
+          console.log(`Auto-joined room '${roomName}'`);
+        }, 500);
       } else {
-        const actualCurrentRoom = currentRoomRef.current;
-        console.log("Sending message:", message, "in room:", actualCurrentRoom);
-        if (actualCurrentRoom === "general") {
-          if (!roomKeysRef.current[actualCurrentRoom]) {
+        console.log("Sending message:", message, "in room:", currentRoom);
+        if (currentRoom === "general") {
+          if (!roomKeysRef.current[currentRoom]) {
             showPopupMessage(
-              `No key for room '${actualCurrentRoom}', please rejoin`,
+              `No key for room '${currentRoom}', please rejoin`,
               "error"
             );
             return;
           }
           console.log(
             "Using encryption key for",
-            actualCurrentRoom,
+            currentRoom,
             ":",
-            roomKeysRef.current[actualCurrentRoom]
+            roomKeysRef.current[currentRoom]
           );
           const encrypted = await encryptMessage(
             message,
-            roomKeysRef.current[actualCurrentRoom]
+            roomKeysRef.current[currentRoom]
           );
           console.log("Encrypted message sent:", encrypted);
           ws.send(JSON.stringify({ type: "text", content: encrypted }));
         } else {
-          console.log(`Sending plain text for '${actualCurrentRoom}'`);
+          console.log(`Sending plain text for '${currentRoom}'`);
           ws.send(JSON.stringify({ type: "text", content: message }));
         }
+        setMessage("");
       }
-      setMessage("");
     }
   };
 
   const handleRoomChange = (e) => {
     const roomName = e.target.value;
     if (!roomName) return;
-    const roomData = rooms.find((r) => r.name === roomName);
-    if (roomData.isPublic) {
+    const room = rooms.find((r) => r.name === roomName);
+    if (room.isPublic) {
       console.log("Switching to room:", roomName);
       ws.send(JSON.stringify({ type: "join", room: roomName }));
-      // setCurrentRoom will be updated by the server's "Joined room:" response
     } else {
       setSelectedRoom(roomName);
       setShowPasswordInput(true);
@@ -458,14 +446,15 @@ function App() {
 
   const handleTyping = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
-    const actualCurrentRoom = currentRoomRef.current;
 
-    ws.send(JSON.stringify({ type: "typing", room: actualCurrentRoom }));
+    // Send "typing" event to server
+    ws.send(JSON.stringify({ type: "typing", room: currentRoom }));
 
+    // Reset typing timeout
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
-      ws.send(JSON.stringify({ type: "stop_typing", room: actualCurrentRoom }));
-    }, 3000); 
+      ws.send(JSON.stringify({ type: "stop_typing", room: currentRoom }));
+    }, 3000); // User stops typing after 3 seconds of inactivity
   };
 
   const handleJoinPrivateRoom = () => {
@@ -481,7 +470,9 @@ function App() {
         password: passwordInput,
       })
     );
-    // setCurrentRoom will be updated by the server's "Joined room:" response
+
+    setCurrentRoom(selectedRoom); //should fix broken rooms functionality
+
     setShowPasswordInput(false);
     setPasswordInput("");
   };
@@ -493,58 +484,52 @@ function App() {
     }
 
     const chunkSize = 64 * 1024; // 64KB
+    const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const actualCurrentRoom = currentRoomRef.current;
 
-    let key = roomKeysRef.current[actualCurrentRoom];
-    if (!key && actualCurrentRoom === "general") {
+    let key = roomKeysRef.current[currentRoom];
+    if (!key && currentRoom === "general") {
       key = await deriveRoomKey("general");
       roomKeysRef.current.general = key;
     }
 
+    if (!key) {
+      showPopupMessage("Missing encryption key for this room", "error");
+      return;
+    }
 
     const fileBuffer = await file.arrayBuffer();
 
-    if (actualCurrentRoom !== "general") {
-       if (!key) { // For non-general rooms, if a key system were implemented, check here.
-                     // Currently, non-general rooms are plaintext for files too.
-        console.log(`No encryption key for room ${actualCurrentRoom}, sending plaintext file.`);
-      }
-      // Plaintext path (non-general rooms)
-      const totalChunksPlain = Math.ceil(file.size / chunkSize); // Recalculate for plaintext
+    // Plaintext path (non-general rooms)
+    if (currentRoom !== "general") {
+      const chunks = [new Uint8Array(fileBuffer)];
+      const totalChunks = 1;
+
       ws.send(
         JSON.stringify({
           type: "file_start",
           uploadId,
           fileName: file.name,
           fileSize: file.size,
-          totalChunks: totalChunksPlain,
-          iv: "", 
+          totalChunks,
+          iv: "", // no encryption
           authTag: "",
         })
       );
 
-      for (let i = 0; i < totalChunksPlain; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = new Uint8Array(fileBuffer.slice(start, end));
-        ws.send(
-          JSON.stringify({
-            type: "file_chunk",
-            uploadId,
-            chunkIndex: i,
-            data: Array.from(chunk),
-          })
-        );
-      }
+      ws.send(
+        JSON.stringify({
+          type: "file_chunk",
+          uploadId,
+          chunkIndex: 0,
+          data: Array.from(chunks[0]),
+        })
+      );
+
       return;
     }
-    
+
     // Encrypted path (general room)
-    if (!key) {
-      showPopupMessage("Missing encryption key for 'general' room", "error");
-      return;
-    }
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
@@ -553,10 +538,15 @@ function App() {
     );
 
     const encryptedBytes = new Uint8Array(encrypted);
-    const authTag = encryptedBytes.slice(-16); 
-    const ciphertext = encryptedBytes.slice(0, -16); 
-    const totalChunksEncrypted = Math.ceil(ciphertext.length / chunkSize);
+    const authTag = encryptedBytes.slice(-16); // last 16 bytes
+    const ciphertext = encryptedBytes.slice(0, -16); // everything else
 
+    const chunks = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, ciphertext.length);
+      chunks.push(new Uint8Array(ciphertext.slice(start, end)));
+    }
 
     const ivHex = Array.from(iv)
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -571,26 +561,23 @@ function App() {
         type: "file_start",
         uploadId,
         fileName: file.name,
-        fileSize: file.size, // Original file size
-        totalChunks: totalChunksEncrypted,
+        fileSize: file.size,
+        totalChunks,
         iv: ivHex,
         authTag: authTagHex,
       })
     );
 
-    for (let i = 0; i < totalChunksEncrypted; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, ciphertext.length);
-      const chunk = new Uint8Array(ciphertext.slice(start, end));
+    chunks.forEach((chunk, index) => {
       ws.send(
         JSON.stringify({
           type: "file_chunk",
           uploadId,
-          chunkIndex: i,
+          chunkIndex: index,
           data: Array.from(chunk),
         })
       );
-    }
+    });
   };
 
   const handleFileSelect = (event) => {
@@ -607,38 +594,24 @@ function App() {
     authTagHex
   ) => {
     try {
-      const actualCurrentRoom = currentRoomRef.current;
-      console.log("Decrypting file:", fileUrl, "for room:", actualCurrentRoom);
+      console.log("Decrypting file:", fileUrl);
       console.log("IV HEX:", ivHex);
       console.log("AuthTag HEX:", authTagHex);
 
       const response = await fetch(fileUrl);
       if (!response.ok)
         throw new Error(`Failed to fetch file: ${response.statusText}`);
-      const fileDataBuffer = await response.arrayBuffer(); // This is ciphertext + authTag for general, or plaintext for others
+      const encryptedBuffer = await response.arrayBuffer();
 
-      if (actualCurrentRoom !== "general" || !ivHex || !authTagHex) {
-        // Handle as plaintext for non-general rooms or if encryption info is missing
-        const blob = new Blob([fileDataBuffer]);
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        link.click();
-        window.URL.revokeObjectURL(url);
-        console.log("Downloaded plaintext file for non-general room.");
-        return;
-      }
-      
-      // Decryption for 'general' room
-      let key = roomKeysRef.current[actualCurrentRoom];
-      if (!key) { // Should ideally always be present if in general room and file has IV/authTag
+      let key = roomKeysRef.current[currentRoom];
+      if (!key && currentRoom === "general") {
         key = await deriveRoomKey("general");
         roomKeysRef.current.general = key;
       }
 
       console.log("Decryption key:", key);
 
+      // Replaced Buffer.from with hexToUint8Array
       const hexToUint8Array = (hex) => {
         const bytes = new Uint8Array(hex.length / 2);
         for (let i = 0; i < hex.length; i += 2) {
@@ -655,12 +628,16 @@ function App() {
       if (authTag.length !== 16)
         throw new Error("Invalid AuthTag length. Expected 16 bytes.");
 
-      // The server now saves ciphertext + authTag together.
-      // So, `fileDataBuffer` is ciphertext + authTag.
+      const fullData = new Uint8Array(
+        encryptedBuffer.byteLength + authTag.length
+      );
+      fullData.set(new Uint8Array(encryptedBuffer), 0);
+      fullData.set(authTag, encryptedBuffer.byteLength);
+
       const decrypted = await crypto.subtle.decrypt(
         { name: "AES-GCM", iv },
         key,
-        fileDataBuffer // This now contains ciphertext + authTag
+        fullData
       );
 
       const blob = new Blob([decrypted]);
@@ -671,11 +648,16 @@ function App() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("File decryption/download failed:", error);
-      showPopupMessage("Failed to decrypt/download file", "error");
+      console.error("File decryption failed:", error);
+      showPopupMessage("Failed to decrypt file", "error");
     }
   };
 
+  /* const isImage = (fileName) => {
+    const ext = fileName.split(".").pop().toLowerCase();
+    return ["jpg", "jpeg", "png", "gif"].includes(ext);
+  
+}*/
 
   return (
     <div className="terminal">
@@ -733,10 +715,12 @@ function App() {
           )}
           <div className="messages">
             {messages.map((msg, i) => {
+              // text messages
               if (msg.type === "text") {
-                const senderName = msg.content.substring(0, msg.content.indexOf(': '));
-                const bodyHtml = msg.content.substring(msg.content.indexOf(': ') + 2);
-                const isOnline = userStatuses[senderName] === "online";
+                // split “sender: HTML” into sender + body
+                const [sender, ...rest] = msg.content.split(": ");
+                const bodyHtml = rest.join(": ");
+                const isOnline = userStatuses[sender] === "online";
 
                 return (
                   <div key={i} className="message">
@@ -747,13 +731,14 @@ function App() {
                           backgroundColor: isOnline ? "limegreen" : "gray",
                         }}
                       />
-                      {senderName}:
+                      {sender}:
                     </strong>{" "}
                     <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
                   </div>
                 );
               }
 
+              // file messages
               if (msg.type === "file") {
                 const isOnline = userStatuses[msg.sender] === "online";
                 return (
@@ -779,14 +764,16 @@ function App() {
                       }
                     >
                       {msg.fileName}{" "}
-                      {currentRoomRef.current === "general" && msg.iv && msg.authTag ? "(encrypted)" : ""}
+                      {currentRoom === "general" ? "(encrypted)" : ""}
                     </button>
                   </div>
                 );
               }
+
               return null;
             })}
 
+            {/* typing notification */}
             {typingUser && (
               <div className="typing-indicator">
                 <span>{typingUser} is typing</span>
@@ -806,7 +793,7 @@ function App() {
               value={message}
               onChange={(e) => {
                 setMessage(e.target.value);
-                handleTyping();
+                handleTyping(); // Notify server that user is typing
               }}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Type a message..."
@@ -831,6 +818,34 @@ function App() {
                 />
               </div>
             )}
+            {/*
+<div className="user-list">
+  <h4>Online</h4>
+  {allUsers
+    .filter((u) => userStatuses[u] === "online")
+    .map((user) => (
+      <div key={user} className="user-entry">
+        <span
+          className="status-circle"
+          style={{ backgroundColor: "limegreen" }}
+        />
+        {user}
+      </div>
+    ))}
+  <h4 style={{ marginTop: "10px" }}>Offline</h4>
+  {allUsers
+    .filter((u) => userStatuses[u] !== "online")
+    .map((user) => (
+      <div key={user} className="user-entry">
+        <span
+          className="status-circle"
+          style={{ backgroundColor: "gray" }}
+        />
+        {user}
+      </div>
+    ))}
+</div>
+*/}
           </div>
         </div>
       )}
