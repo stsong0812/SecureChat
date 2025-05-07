@@ -1,3 +1,4 @@
+// client/src/App.js
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import EmojiPicker from "emoji-picker-react";
@@ -87,6 +88,12 @@ function App() {
   const [userStatuses, setUserStatuses] = useState({});
   const [allUsers, setAllUsers] = useState([]); // List of all registered usernames
 
+  const currentRoomRef = useRef(currentRoom);
+
+  useEffect(() => {
+    currentRoomRef.current = currentRoom;
+  }, [currentRoom]);
+
   useEffect(() => {
     const initializeKeysAndWebSocket = async () => {
       const generalKey = await deriveRoomKey("general");
@@ -125,12 +132,13 @@ function App() {
           } = data;
 
           console.log("Parsed message:", data);
+          const actualCurrentRoom = currentRoomRef.current; // Use the ref for current room
 
           if (type === "status") {
             showPopupMessage(message, "success");
             if (message.startsWith("Joined room:")) {
               const roomName = message.split(":")[1].trim();
-              setCurrentRoom(roomName);
+              setCurrentRoom(roomName); // This will trigger the useEffect to update currentRoomRef
               setMessages([]);
               console.log(
                 `Switched to room '${roomName}', current keys:`,
@@ -150,27 +158,27 @@ function App() {
               setLoggedIn(true);
               websocket.send(JSON.stringify({ type: "get_rooms" }));
               websocket.send(JSON.stringify({ type: "get_users" }));
-              setCurrentRoom("general");
+              setCurrentRoom("general"); // This will update currentRoomRef via useEffect
             }
           } else if (type === "error") {
             showPopupMessage(message, "error");
           } else if (type === "text") {
             if (
-              currentRoom === "general" &&
-              !roomKeysRef.current[currentRoom]
+              actualCurrentRoom === "general" &&
+              !roomKeysRef.current[actualCurrentRoom]
             ) {
               console.log(
-                `Key not ready for '${currentRoom}', queuing message`
+                `Key not ready for '${actualCurrentRoom}', queuing message`
               );
-              if (!pendingMessagesRef.current[currentRoom]) {
-                pendingMessagesRef.current[currentRoom] = [];
+              if (!pendingMessagesRef.current[actualCurrentRoom]) {
+                pendingMessagesRef.current[actualCurrentRoom] = [];
               }
               pendingMessagesRef.current[actualCurrentRoom].push({
                 sender,
                 content,
               });
             } else {
-              await processTextMessage(sender, content, currentRoom);
+              await processTextMessage(sender, content, actualCurrentRoom);
             }
           } else if (type === "user_list") {
             setAllUsers(data.users);
@@ -222,6 +230,7 @@ function App() {
     initializeKeysAndWebSocket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   useEffect(() => {
     const handleActivity = () => {
       if (ws && ws.readyState === WebSocket.OPEN && loggedIn) {
@@ -236,6 +245,7 @@ function App() {
       events.forEach((e) => window.removeEventListener(e, handleActivity));
     };
   }, [ws, loggedIn]);
+
   const decryptMessage = async (encrypted, key) => {
     try {
       const decoder = new TextDecoder();
@@ -261,8 +271,8 @@ function App() {
   };
 
   const processTextMessage = async (sender, content, room) => {
-    console.log("Processing text message:", { sender, content });
-    let decrypted;
+    console.log("Processing text message for room:", room, { sender, content });
+    let decryptedText;
     if (room === "general") {
       if (!roomKeysRef.current[room]) {
         console.error(`No decryption key available for room: ${room}`);
@@ -281,11 +291,11 @@ function App() {
       }
     } else {
       console.log(`No encryption for '${room}', processing as plain text`);
-      decrypted =
+      decryptedText =
         typeof content === "string" ? content : "[Invalid message format]";
     }
-    console.log("Decrypted message:", decrypted);
-    const formatted = parseFormattedText(decrypted);
+    console.log("Decrypted/Processed message text:", decryptedText);
+    const formatted = parseFormattedText(decryptedText);
     setMessages((prev) => {
       const newMessages = [
         ...prev,
@@ -343,14 +353,7 @@ function App() {
 
   const logout = () => {
     if (ws && isConnected) {
-      ws.close();
-      setLoggedIn(false);
-      setUsername("");
-      setPassword("");
-      setMessages([]);
-      setCurrentRoom("general");
-      setRooms([{ name: "general", isPublic: true }]);
-      roomKeysRef.current = { general: roomKeysRef.current.general }; // Retain only general key
+      ws.close(); // This will trigger onclose, setting isConnected and loggedIn to false
     }
   };
 
@@ -404,7 +407,7 @@ function App() {
         }
         const roomName = parts[1];
         const visibility = parts[2] || "public";
-        const password = parts[3] || "";
+        const roomPassword = parts[3] || ""; // Renamed from password to avoid conflict
         const isPublic = visibility === "public";
         ws.send(
           JSON.stringify({
@@ -414,35 +417,33 @@ function App() {
             password: roomPassword,
           })
         );
-        setTimeout(() => {
-          ws.send(JSON.stringify({ type: "join_room", room: roomName }));
-          setCurrentRoom(roomName);
-          console.log(`Auto-joined room '${roomName}'`);
-        }, 500);
+        // Server should handle joining the room and sending confirmation.
+        // Client updates currentRoom upon receiving "Joined room:" status.
       } else {
-        console.log("Sending message:", message, "in room:", currentRoom);
-        if (currentRoom === "general") {
-          if (!roomKeysRef.current[currentRoom]) {
+        const actualCurrentRoom = currentRoomRef.current;
+        console.log("Sending message:", message, "in room:", actualCurrentRoom);
+        if (actualCurrentRoom === "general") {
+          if (!roomKeysRef.current[actualCurrentRoom]) {
             showPopupMessage(
-              `No key for room '${currentRoom}', please rejoin`,
+              `No key for room '${actualCurrentRoom}', please rejoin`,
               "error"
             );
             return;
           }
           console.log(
             "Using encryption key for",
-            currentRoom,
+            actualCurrentRoom,
             ":",
-            roomKeysRef.current[currentRoom]
+            roomKeysRef.current[actualCurrentRoom]
           );
           const encrypted = await encryptMessage(
             message,
-            roomKeysRef.current[currentRoom]
+            roomKeysRef.current[actualCurrentRoom]
           );
           console.log("Encrypted message sent:", encrypted);
           ws.send(JSON.stringify({ type: "text", content: encrypted }));
         } else {
-          console.log(`Sending plain text for '${currentRoom}'`);
+          console.log(`Sending plain text for '${actualCurrentRoom}'`);
           ws.send(JSON.stringify({ type: "text", content: message }));
         }
       }
@@ -453,8 +454,8 @@ function App() {
   const handleRoomChange = (e) => {
     const roomName = e.target.value;
     if (!roomName) return;
-    const room = rooms.find((r) => r.name === roomName);
-    if (room.isPublic) {
+    const roomData = rooms.find((r) => r.name === roomName);
+    if (roomData.isPublic) {
       console.log("Switching to room:", roomName);
       ws.send(JSON.stringify({ type: "join_room", room: roomName }));
       // setCurrentRoom will be updated by the server's "Joined room:" response
@@ -468,11 +469,10 @@ function App() {
 
   const handleTyping = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
+    const actualCurrentRoom = currentRoomRef.current;
 
-    // Send "typing" event to server
-    ws.send(JSON.stringify({ type: "typing", room: currentRoom }));
+    ws.send(JSON.stringify({ type: "typing", room: actualCurrentRoom }));
 
-    // Reset typing timeout
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
       ws.send(JSON.stringify({ type: "stop_typing", room: actualCurrentRoom }));
@@ -492,9 +492,7 @@ function App() {
         password: passwordInput,
       })
     );
-
-    setCurrentRoom(selectedRoom); //should fix broken rooms functionality
-
+    // setCurrentRoom will be updated by the server's "Joined room:" response
     setShowPasswordInput(false);
     setPasswordInput("");
   };
@@ -506,11 +504,11 @@ function App() {
     }
 
     const chunkSize = 64 * 1024; // 64KB
-    const totalChunks = Math.ceil(file.size / chunkSize);
     const uploadId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const actualCurrentRoom = currentRoomRef.current;
 
-    let key = roomKeysRef.current[currentRoom];
-    if (!key && currentRoom === "general") {
+    let key = roomKeysRef.current[actualCurrentRoom];
+    if (!key && actualCurrentRoom === "general") {
       key = await deriveRoomKey("general");
       roomKeysRef.current.general = key;
     }
@@ -539,19 +537,27 @@ function App() {
         })
       );
 
-      ws.send(
-        JSON.stringify({
-          type: "file_chunk",
-          uploadId,
-          chunkIndex: 0,
-          data: Array.from(chunks[0]),
-        })
-      );
-
+      for (let i = 0; i < totalChunksPlain; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = new Uint8Array(fileBuffer.slice(start, end));
+        ws.send(
+          JSON.stringify({
+            type: "file_chunk",
+            uploadId,
+            chunkIndex: i,
+            data: Array.from(chunk),
+          })
+        );
+      }
       return;
     }
 
     // Encrypted path (general room)
+    if (!key) {
+      showPopupMessage("Missing encryption key for 'general' room", "error");
+      return;
+    }
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
@@ -577,23 +583,26 @@ function App() {
         type: "file_start",
         uploadId,
         fileName: file.name,
-        fileSize: file.size,
-        totalChunks,
+        fileSize: file.size, // Original file size
+        totalChunks: totalChunksEncrypted,
         iv: ivHex,
         authTag: authTagHex,
       })
     );
 
-    chunks.forEach((chunk, index) => {
+    for (let i = 0; i < totalChunksEncrypted; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, ciphertext.length);
+      const chunk = new Uint8Array(ciphertext.slice(start, end));
       ws.send(
         JSON.stringify({
           type: "file_chunk",
           uploadId,
-          chunkIndex: index,
+          chunkIndex: i,
           data: Array.from(chunk),
         })
       );
-    });
+    }
   };
 
   const handleFileSelect = (event) => {
@@ -610,14 +619,15 @@ function App() {
     authTagHex
   ) => {
     try {
-      console.log("Decrypting file:", fileUrl);
+      const actualCurrentRoom = currentRoomRef.current;
+      console.log("Decrypting file:", fileUrl, "for room:", actualCurrentRoom);
       console.log("IV HEX:", ivHex);
       console.log("AuthTag HEX:", authTagHex);
 
       const response = await fetch(fileUrl);
       if (!response.ok)
         throw new Error(`Failed to fetch file: ${response.statusText}`);
-      const encryptedBuffer = await response.arrayBuffer();
+      const fileDataBuffer = await response.arrayBuffer(); // This is ciphertext + authTag for general, or plaintext for others
 
       if (actualCurrentRoom !== "general" || !ivHex || !authTagHex) {
         // Handle as plaintext for non-general rooms or if encryption info is missing
@@ -642,7 +652,6 @@ function App() {
 
       console.log("Decryption key:", key);
 
-      // Replaced Buffer.from with hexToUint8Array
       const hexToUint8Array = (hex) => {
         const bytes = new Uint8Array(hex.length / 2);
         for (let i = 0; i < hex.length; i += 2) {
@@ -659,16 +668,12 @@ function App() {
       if (authTag.length !== 16)
         throw new Error("Invalid AuthTag length. Expected 16 bytes.");
 
-      const fullData = new Uint8Array(
-        encryptedBuffer.byteLength + authTag.length
-      );
-      fullData.set(new Uint8Array(encryptedBuffer), 0);
-      fullData.set(authTag, encryptedBuffer.byteLength);
-
+      // The server now saves ciphertext + authTag together.
+      // So, `fileDataBuffer` is ciphertext + authTag.
       const decrypted = await crypto.subtle.decrypt(
         { name: "AES-GCM", iv },
         key,
-        fullData
+        fileDataBuffer // This now contains ciphertext + authTag
       );
 
       const blob = new Blob([decrypted]);
@@ -679,8 +684,8 @@ function App() {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("File decryption failed:", error);
-      showPopupMessage("Failed to decrypt file", "error");
+      console.error("File decryption/download failed:", error);
+      showPopupMessage("Failed to decrypt/download file", "error");
     }
   };
 
@@ -740,7 +745,6 @@ function App() {
           )}
           <div className="messages">
             {messages.map((msg, i) => {
-              // text messages
               if (msg.type === "text") {
                 const senderName = msg.content.substring(
                   0,
@@ -760,14 +764,13 @@ function App() {
                           backgroundColor: isOnline ? "limegreen" : "gray",
                         }}
                       />
-                      {sender}:
+                      {senderName}:
                     </strong>{" "}
                     <span dangerouslySetInnerHTML={{ __html: bodyHtml }} />
                   </div>
                 );
               }
 
-              // file messages
               if (msg.type === "file") {
                 const isOnline = userStatuses[msg.sender] === "online";
                 return (
@@ -802,11 +805,9 @@ function App() {
                   </div>
                 );
               }
-
               return null;
             })}
 
-            {/* typing notification */}
             {typingUser && (
               <div className="typing-indicator">
                 <span>{typingUser} is typing</span>
@@ -826,7 +827,7 @@ function App() {
               value={message}
               onChange={(e) => {
                 setMessage(e.target.value);
-                handleTyping(); // Notify server that user is typing
+                handleTyping();
               }}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Type a message..."
@@ -851,34 +852,6 @@ function App() {
                 />
               </div>
             )}
-            {/*
-<div className="user-list">
-  <h4>Online</h4>
-  {allUsers
-    .filter((u) => userStatuses[u] === "online")
-    .map((user) => (
-      <div key={user} className="user-entry">
-        <span
-          className="status-circle"
-          style={{ backgroundColor: "limegreen" }}
-        />
-        {user}
-      </div>
-    ))}
-  <h4 style={{ marginTop: "10px" }}>Offline</h4>
-  {allUsers
-    .filter((u) => userStatuses[u] !== "online")
-    .map((user) => (
-      <div key={user} className="user-entry">
-        <span
-          className="status-circle"
-          style={{ backgroundColor: "gray" }}
-        />
-        {user}
-      </div>
-    ))}
-</div>
-*/}
           </div>
         </div>
       )}
