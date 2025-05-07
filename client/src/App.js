@@ -416,7 +416,10 @@ function App() {
       ];
 
       outputLines.forEach((line) => {
-        setMessages((prev) => [...prev, { type: "text", content: line }]);
+        setMessages((prev) => [
+          ...prev,
+          { type: "text", content: line, isHtml: true },
+        ]);
       });
 
       setMessage("");
