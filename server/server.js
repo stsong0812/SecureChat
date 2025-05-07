@@ -371,7 +371,7 @@ wss.on("connection", (socket) => {
       }
       const rows = db.prepare("SELECT username FROM users").all();
       const users = rows.map((r) => r.username);
-      socket.send(JSON.stringify({ type: "user_list", users }));
+      socket.send(JSON.stringify({ type: "user_list", data: { users } }));
     } else if (type === "join_room") {
       if (!socket.authenticated) {
         socket.send(
