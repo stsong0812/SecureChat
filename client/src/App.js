@@ -362,24 +362,24 @@ function App() {
       showPopupMessage("Not logged in or WebSocket not connected", "error");
       return;
     }
-    if (message.trim()) {
-      if (message.trim() === "/help") {
-        const helpText = [
-          "*bold* → bold",
-          "_italic_ → italic",
-          "[text](url) → clickable link",
-          "/create roomName [public|private] [password] → create a chat room",
-          "/users → list all users with status",
-        ];
-        helpText.forEach((line) => {
-          setMessages((prev) => [
-            ...prev,
-            { type: "text", content: `system: ${line}` },
-          ]);
-        });
-        setMessage("");
-        return;
-      }
+    if (message.trim() === "/help") {
+      const helpOutput = `
+    <b style="color:#00ff00">${username}@localhost:~$</b> help<br>
+    *bold* → bold<br>
+    _italic_ → italic<br>
+    [text](url) → clickable link<br>
+    /create roomName [public|private] [password] → create a chat room<br>
+    /users → list all users with status
+      `.trim();
+    
+      setMessages((prev) => [
+        ...prev,
+        { type: "text", content: helpOutput },
+      ]);
+      setMessage("");
+      return;
+    }
+    
       if (message.trim() === "/users") {
         allUsers.forEach((user) => {
           const isOnline = userStatuses[user] === "online";
