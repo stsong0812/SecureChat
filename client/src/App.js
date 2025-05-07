@@ -477,7 +477,7 @@ function App() {
     }
   };
 
-  let typingTimeout;
+  const typingTimeoutRef = useRef(null);
 
   const handleTyping = () => {
     if (!ws || ws.readyState !== WebSocket.OPEN || !loggedIn) return;
@@ -485,8 +485,11 @@ function App() {
 
     ws.send(JSON.stringify({ type: "typing", room: actualCurrentRoom }));
 
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
       ws.send(JSON.stringify({ type: "stop_typing", room: actualCurrentRoom }));
     }, 3000);
   };
