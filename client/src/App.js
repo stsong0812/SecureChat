@@ -619,28 +619,32 @@ function App() {
 	}
   };
 
-  const decryptAndDownloadFile = async (fileUrl, fileName) => {
-	try {
-  	console.log("Downloading file:", fileUrl);
+const decryptAndDownloadFile = async (fileUrl, fileName) => {
+    try {
+      console.log("Downloading file:", fileUrl, "Name:", fileName);
 
-  	const response = await fetch(fileUrl);
-  	if (!response.ok)
-    	throw new Error(`Failed to fetch file: ${response.statusText}`);
-  	const fileDataBuffer = await response.arrayBuffer();
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.statusText} (${response.status})`);
+      }
+      const fileDataBuffer = await response.arrayBuffer();
 
-  	const blob = new Blob([fileDataBuffer]);
-  	const url = window.URL.createObjectURL(blob);
-  	const link = document.createElement("a");
-  	link.href = url;
-  	link.download = fileName;
-  	link.click();
-  	window.URL.revokeObjectURL(url);
-  	console.log("Downloaded plaintext file.");
-	} catch (error) {
-  	console.error("File download failed:", error);
-  	showPopupMessage("Failed to download file", "error");
-	}
+      const blob = new Blob([fileDataBuffer]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link); // Required for Firefox
+      link.click();
+      document.body.removeChild(link); // Clean up
+      window.URL.revokeObjectURL(url);
+      console.log("Downloaded plaintext file.");
+    } catch (error) {
+      console.error("File download failed:", error);
+      showPopupMessage(`Failed to download file: ${error.message}`, "error");
+    }
   };
+
 
   return (
 	<div className="terminal">
