@@ -1,6 +1,10 @@
-## SecureChat link
+# SecureChat link
 
 insecurechat.com
+
+# GitHub Link
+
+https://github.com/stsong0812/SecureChat
 
 ## Railway Deployment Guide
 
